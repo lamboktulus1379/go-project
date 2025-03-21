@@ -1,6 +1,9 @@
 package filecsv
 
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 type IValidateFile interface {
 	AppendAllData(data [][]string)
@@ -18,12 +21,20 @@ func NewValidateFile(file *os.File) IValidateFile {
 }
 
 func (validateFile *ValidateFile) AppendData(data []string) {
-	validateFile.File.WriteString(data[0] + "\n")
+	writeString, err := validateFile.File.WriteString(data[0] + "\n")
+	if err != nil {
+		return
+	}
+	fmt.Println(string(writeString))
 }
 
 func (validateFile *ValidateFile) AppendAllData(data [][]string) {
 	for _, row := range data {
-		validateFile.File.WriteString(row[0] + "\n")
+		writeString, err := validateFile.File.WriteString(row[0] + "\n")
+		if err != nil {
+			return
+		}
+		fmt.Println(string(writeString))
 	}
 }
 
@@ -48,5 +59,8 @@ func (validateFile *ValidateFile) ReadData() ([]string, error) {
 }
 
 func (validateFile *ValidateFile) Close() {
-	validateFile.File.Close()
+	err := validateFile.File.Close()
+	if err != nil {
+		return
+	}
 }

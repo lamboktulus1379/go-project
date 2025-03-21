@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"my-project/domain/dto"
@@ -18,9 +19,9 @@ func Auth(userRepository repository.IUser) gin.HandlerFunc {
 
 	var res dto.Res
 	res.ResponseCode = "401"
-	res.ResponseMessage = "Unautorized"
+	res.ResponseMessage = "Unauthorized"
 
-	log.Println("Inside auth middeware")
+	log.Println("Inside auth middleware")
 	return func(ctx *gin.Context) {
 
 		authorization := ctx.Request.Header.Get("Authorization")
@@ -51,21 +52,21 @@ func Auth(userRepository repository.IUser) gin.HandlerFunc {
 			}
 			ctx.Set("user_id", userClaims.Issuer)
 			ctx.Next()
-		} else if ve, ok := err.(*jwt.ValidationError); ok {
-			if ve.Errors&jwt.ValidationErrorMalformed != 0 {
-				res.ResponseMessage = "That's not even a token"
-			} else if ve.Errors&(jwt.ValidationErrorExpired|jwt.ValidationErrorNotValidYet) != 0 {
-				// Token is either expired or not active yet
-				res.ResponseMessage = "Timing is everything"
-			} else {
-				res.ResponseMessage = fmt.Sprintf("Couldn't handle this token:%v", err)
-			}
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
-			return
 		} else {
-			res.ResponseMessage = fmt.Sprintf("Couldn't handle this token: %v", err)
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
-			return
+			var ve *jwt.ValidationError
+			if errors.As(err, &ve) {
+				if ve.Errors&jwt.ValidationErrorMalformed != 0 {
+					res.ResponseMessage = "That's not even a token"
+				} else if ve.Errors&(jwt.ValidationErrorExpired|jwt.ValidationErrorNotValidYet) != 0 {
+					// Token is either expired or not active yet
+					res.ResponseMessage = "Timing is everything"
+				} else {
+					res.ResponseMessage = fmt.Sprintf("Couldn't handle this token:%v", err)
+				}
+				ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+				return
+			}
 		}
+
 	}
 }

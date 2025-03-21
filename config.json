@@ -24,6 +24,14 @@
             "port": "3306",
             "user": "project",
             "password": "MyPassword_123"
+        },
+        "mongo": {
+            "name": "my_project",
+            "host": "localhost",
+            "user": "project",
+            "password": "MyPassword_123",
+            "port": "27017",
+            "url": "mongodb+srv://useradmin:password@cluster0.vz5ln.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
         }
     },
     "tulusTech": {
@@ -44,7 +52,7 @@
     },
     "redisClient": {
         "username": "default",
-        "password": "[password]",
+        "password": "MyPassword_123",
         "host": "redis-18200.c56.east-us.azure.redns.redis-cloud.com",
         "port": "18200",
         "databaseName": "cache-M4LG2M2D"

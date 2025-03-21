@@ -86,7 +86,7 @@ type RedisClient struct {
 	Host         string `json:"host"`
 	Port         string `json:"port"`
 	Password     string `json:"password"`
-	DatabaseName int    `json:"databaseName"`
+	DatabaseName string `json:"databaseName"`
 	Username     string `json:"username"`
 }
 

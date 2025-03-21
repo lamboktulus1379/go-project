@@ -8,7 +8,7 @@ import (
 
 func NewMongoDb(host string, port string, username string, password string, database string) (*mongo.Client, error) {
 	// connect to mongodb
-	client, err := mongo.Connect(options.Client().ApplyURI("mongodb://" + username + ":" + password + "@" + host + ":" + port + "/" + database))
+	client, err := mongo.Connect(options.Client().ApplyURI("mongodb://" + username + ":" + password + "@" + host + ":" + port + "/" + database + "s?authSource=admin&authMechanism=SCRAM-SHA-256"))
 	if err != nil {
 		logger.GetLogger().WithField("error", err).Error("Failed to connect to MongoDB")
 		return nil, err
