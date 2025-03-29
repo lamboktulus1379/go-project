@@ -4,8 +4,6 @@ import (
 	"context"
 	"log"
 
-	"sync"
-
 	"cloud.google.com/go/pubsub"
 )
 
@@ -13,8 +11,8 @@ var (
 	topic *pubsub.Topic
 
 	// Messages received by this instance.
-	messagesMu sync.Mutex
-	messages   []string
+	//messagesMu sync.Mutex
+	//messages   []string
 
 	// token is used to verify push requests.
 )

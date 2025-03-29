@@ -13,7 +13,6 @@ type ITulusHost interface {
 }
 
 type TulusHost struct {
-	id   string
 	host string
 }
 

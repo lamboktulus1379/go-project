@@ -25,7 +25,10 @@ func NewValidateCsv(file *os.File) IValidateCsvInterface {
 
 func (validateCsv *ValidateCsv) AppendData(data []string) {
 	w := csv.NewWriter(validateCsv.File)
-	w.Write(data)
+	err := w.Write(data)
+	if err != nil {
+		return
+	}
 
 	if err := w.Error(); err != nil {
 		logger.GetLogger().WithField("error", err).Error("Error while AppendData to CSV")
@@ -35,7 +38,10 @@ func (validateCsv *ValidateCsv) AppendData(data []string) {
 
 func (validateCsv *ValidateCsv) AppendAllData(data [][]string) {
 	w := csv.NewWriter(validateCsv.File)
-	w.WriteAll(data)
+	err := w.WriteAll(data)
+	if err != nil {
+		logger.GetLogger().WithField("error", err).Error("Error while AppendAllData to CSV")
+	}
 
 	if err := w.Error(); err != nil {
 		logger.GetLogger().WithField("error", err).Error("Error while AppendAllData to CSV")

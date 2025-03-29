@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"my-project/infrastructure/logger"
 	"net/http"
 	"os"
 
@@ -65,8 +66,16 @@ func saveToken(path string, token *oauth2.Token) {
 	if err != nil {
 		log.Printf("Unable to cache oauth token: %v\n", err)
 	}
-	defer f.Close()
-	json.NewEncoder(f).Encode(token)
+	defer func(f *os.File) {
+		err := f.Close()
+		if err != nil {
+			log.Printf("Error closing file: %v\n", err)
+		}
+	}(f)
+	err = json.NewEncoder(f).Encode(token)
+	if err != nil {
+		logger.GetLogger().Error("Unable to encode oauth token: %v", err)
+	}
 }
 
 func NewGoogleSheet() (*sheets.Service, error) {

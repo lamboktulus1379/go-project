@@ -28,7 +28,7 @@ func PooledWorkError(allData []model.Project, db *sql.DB) {
 		}()
 	}
 
-	for i, _ := range allData {
+	for i := range allData {
 		dataCh <- allData[i]
 	}
 

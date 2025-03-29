@@ -21,11 +21,10 @@ func NewValidateFile(file *os.File) IValidateFile {
 }
 
 func (validateFile *ValidateFile) AppendData(data []string) {
-	writeString, err := validateFile.File.WriteString(data[0] + "\n")
+	_, err := validateFile.File.WriteString(data[0] + "\n")
 	if err != nil {
 		return
 	}
-	fmt.Println(string(writeString))
 }
 
 func (validateFile *ValidateFile) AppendAllData(data [][]string) {
@@ -34,7 +33,7 @@ func (validateFile *ValidateFile) AppendAllData(data [][]string) {
 		if err != nil {
 			return
 		}
-		fmt.Println(string(writeString))
+		fmt.Println(string(rune(writeString)))
 	}
 }
 

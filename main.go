@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"my-project/infrastructure/cache"
@@ -12,6 +13,7 @@ import (
 	"my-project/infrastructure/pubsub"
 	"my-project/infrastructure/servicebus"
 	httpHandler "my-project/interfaces/http"
+	"my-project/server"
 	"my-project/usecase"
 	"net/http"
 	"os"
@@ -105,7 +107,7 @@ func main() {
 	userHandler := httpHandler.NewUserHandler(userUsecase)
 	testHandler := httpHandler.NewTestHandler(testUsecase)
 
-	router := InitiateRouter(userHandler, testHandler, userRepository)
+	router := server.InitiateRouter(userHandler, testHandler, userRepository)
 
 	if err != nil {
 		logger.GetLogger().WithField("error", err).Error("Error while StartSubscription")
@@ -154,5 +156,30 @@ func main() {
 	if err != nil {
 		log.Printf("server returning an error %v", err)
 		os.Exit(2)
+	}
+}
+
+func InitiateDatabase() (*sql.DB, *sql.DB, error) {
+	var err error
+
+	db, err := persistence.NewNativeDb()
+	if err != nil {
+		logger.GetLogger().WithField("error", err).Error("Cannot connect to the local database")
+		return nil, nil, err
+	}
+
+	postgres, err := persistence.NewPostgreSQLDb()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return db, postgres, err
+}
+
+func InitiateGoroutine() {
+	fmt.Println("Hello World!")
+
+	for i := 0; i < 10; i++ {
+		go fmt.Println(i)
 	}
 }
