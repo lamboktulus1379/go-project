@@ -3,14 +3,14 @@ package pubsub
 import (
 	"context"
 	"log"
-	"my-project/infrastructure/logger"
 
 	"cloud.google.com/go/pubsub"
+	"my-project/infrastructure/logger"
 )
 
 type ITestPubSub interface {
 	Publish(ctx context.Context, topic string, payload []byte) (string, error)
-	GetSubscription(ctx context.Context, subID string) (*pubsub.Subscription, error)
+	GetSubscription(subID string) (*pubsub.Subscription, error)
 }
 
 type TestPubSub struct {
@@ -23,7 +23,11 @@ func NewTestPubSub(pubSubClient *pubsub.Client) ITestPubSub {
 	}
 }
 
-func (testPubSub *TestPubSub) Publish(ctx context.Context, topicName string, payload []byte) (string, error) {
+func (testPubSub *TestPubSub) Publish(
+	ctx context.Context,
+	topicName string,
+	payload []byte,
+) (string, error) {
 	msg := &pubsub.Message{
 		Data: payload,
 	}
@@ -52,7 +56,9 @@ func (testPubSub *TestPubSub) Publish(ctx context.Context, topicName string, pay
 	return serverId, nil
 }
 
-func (testPubSub *TestPubSub) GetSubscription(ctx context.Context, subID string) (*pubsub.Subscription, error) {
+func (testPubSub *TestPubSub) GetSubscription(
+	subID string,
+) (*pubsub.Subscription, error) {
 	logger.GetLogger().WithField("subID", subID).Info("PubSub starting...")
 
 	return testPubSub.PubSubClient.Subscription(subID), nil

@@ -3,8 +3,9 @@ package persistence
 import (
 	"database/sql"
 	"fmt"
-	"my-project/infrastructure/configuration"
 	"time"
+
+	"my-project/infrastructure/configuration"
 )
 
 func NewNativeDb() (*sql.DB, error) {

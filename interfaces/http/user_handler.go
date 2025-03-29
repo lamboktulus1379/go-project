@@ -4,12 +4,16 @@ import (
 	"crypto/md5"
 	"fmt"
 	"log"
-	"my-project/domain/model"
-	"my-project/infrastructure/logger"
-	"my-project/usecase"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"my-project/domain/model"
+	"my-project/infrastructure/logger"
+	"my-project/usecase"
+)
+
+const (
+	ErrorUnmarshal = "Error while unmarshal"
 )
 
 type IUserHandler interface {
@@ -29,9 +33,8 @@ func (userHandler *UserHandler) Login(c *gin.Context) {
 	var req model.ReqLogin
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("An error occurred: %v", err)
-		logger.GetLogger().WithField("error", err).Error("An error occurred")
-		c.JSON(http.StatusBadRequest, fmt.Sprintf("An error occurred: %v", err.Error()))
+		logger.GetLogger().WithField("error", err).Error(ErrorUnmarshal)
+		c.JSON(http.StatusBadRequest, fmt.Sprintf("%s %v", ErrorUnmarshal, err.Error()))
 		return
 	}
 

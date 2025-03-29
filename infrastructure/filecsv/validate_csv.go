@@ -4,8 +4,9 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"my-project/infrastructure/logger"
 	"os"
+
+	"my-project/infrastructure/logger"
 )
 
 type IValidateCsvInterface interface {
@@ -74,5 +75,10 @@ func (validateCsv *ValidateCsv) ReadData() ([]string, error) {
 }
 
 func (validateCsv *ValidateCsv) Close() {
-	defer validateCsv.File.Close()
+	defer func(File *os.File) {
+		err := File.Close()
+		if err != nil {
+			logger.GetLogger().WithField("error", err).Error("Error while closing CSV file")
+		}
+	}(validateCsv.File)
 }

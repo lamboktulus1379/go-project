@@ -5,6 +5,15 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"my-project/infrastructure/filecsv"
+	"my-project/infrastructure/googlesheet"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"golang.org/x/sync/errgroup"
 	"my-project/infrastructure/cache"
 	tulushost "my-project/infrastructure/clients/tulustech"
 	"my-project/infrastructure/configuration"
@@ -15,18 +24,9 @@ import (
 	httpHandler "my-project/interfaces/http"
 	"my-project/server"
 	"my-project/usecase"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"golang.org/x/sync/errgroup"
 )
 
-var (
-	httpServer *http.Server
-)
+var httpServer *http.Server
 
 func recoverPanic() {
 	if err := recover(); err != nil {
@@ -35,7 +35,7 @@ func recoverPanic() {
 }
 
 func main() {
-	//InitiateGoroutine()
+	InitiateGoroutine()
 	defer recoverPanic()
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -56,7 +56,13 @@ func main() {
 		fmt.Println(err)
 	}
 
-	mongoDb, err := persistence.NewMongoDb(configuration.C.Database.Mongo.Host, configuration.C.Database.Mongo.Port, configuration.C.Database.Mongo.User, configuration.C.Database.Mongo.Password, configuration.C.Database.Mongo.Name)
+	mongoDb, err := persistence.NewMongoDb(
+		configuration.C.Database.Mongo.Host,
+		configuration.C.Database.Mongo.Port,
+		configuration.C.Database.Mongo.User,
+		configuration.C.Database.Mongo.Password,
+		configuration.C.Database.Mongo.Name,
+	)
 	if err != nil {
 		logger.GetLogger().WithField("error", err).Error("Error while instantiate MongoDB")
 		panic(err)
@@ -68,7 +74,10 @@ func main() {
 	}
 	fmt.Println("MongoDB connected")
 
-	logger.GetLogger().WithField("MySQLDb", mysqlDb.Ping()).WithField("PSQLDb", psqlDb.Ping()).Info("Database connected.")
+	logger.GetLogger().
+		WithField("MySQLDb", mysqlDb.Ping()).
+		WithField("PSQLDb", psqlDb.Ping()).
+		Info("Database connected.")
 
 	pubSubClient, err := pubsub.NewPubSub(ctx, configuration.C.Pubsub.ProjectID)
 	if err != nil {
@@ -81,9 +90,14 @@ func main() {
 		logger.GetLogger().WithField("error", err).Error("Error while instantiate ServiceBus")
 		panic(err)
 	}
-	redisClient, _ := cache.NewCache(ctx, fmt.Sprintf("%s:%s", configuration.C.RedisClient.Host, configuration.C.RedisClient.Port), configuration.C.RedisClient.Username, configuration.C.RedisClient.Password)
+	redisClient, _ := cache.NewCache(
+		ctx,
+		fmt.Sprintf("%s:%s", configuration.C.RedisClient.Host, configuration.C.RedisClient.Port),
+		configuration.C.RedisClient.Username,
+		configuration.C.RedisClient.Password,
+	)
 
-	testRepository := persistence.NewTestRepository(mongoDb)
+	testRepository := persistence.NewTestRepository(mongoDb, psqlDb)
 	project, err := testRepository.Test(ctx)
 	if err != nil {
 		logger.GetLogger().WithField("error", err).Error("Error while fetching data")
@@ -101,8 +115,8 @@ func main() {
 	userRepository := persistence.NewUserRepository(psqlDb)
 	userUsecase := usecase.NewUserUsecase(userRepository)
 	testUsecase := usecase.NewTestUsecase(tulusTechHost, testPubSub, testServiceBus, testCache)
-	//testRes := testUsecase.Test(ctx)
-	//fmt.Println("Test response", testRes)
+	// testRes := testUsecase.Test(ctx)
+	// fmt.Println("Test response", testRes)
 
 	userHandler := httpHandler.NewUserHandler(userUsecase)
 	testHandler := httpHandler.NewTestHandler(testUsecase)
@@ -112,6 +126,8 @@ func main() {
 	if err != nil {
 		logger.GetLogger().WithField("error", err).Error("Error while StartSubscription")
 	}
+
+	Test()
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)
@@ -168,7 +184,7 @@ func InitiateDatabase() (*sql.DB, *sql.DB, error) {
 		return nil, nil, err
 	}
 
-	postgres, err := persistence.NewPostgreSQLDb()
+	postgres, err := persistence.NewPostgreSQLDB()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -182,4 +198,21 @@ func InitiateGoroutine() {
 	for i := 0; i < 10; i++ {
 		go fmt.Println(i)
 	}
+}
+
+func Test() {
+	file, err := filecsv.NewFile("cover.txt")
+	if err != nil {
+		logger.GetLogger().WithField("error", err).Error("Error while loading file")
+	}
+
+	validateCsv := filecsv.NewValidateCsv(file)
+	logger.GetLogger().WithField("validateCsv", validateCsv).Info("Validate CSV initialized")
+
+	googleSheet, err := googlesheet.NewGoogleSheet()
+	if err != nil {
+		logger.GetLogger().WithField("error", err).Error("Error while loading Google Sheet")
+	}
+
+	logger.GetLogger().WithField("googleSheet", googleSheet).Info("Google sheet initialized")
 }

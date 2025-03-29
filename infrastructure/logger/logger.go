@@ -28,7 +28,11 @@ func init() {
 		logger.Out = os.Stdout
 	}
 	if env == "prod" || env == "" {
-		file, err := os.OpenFile(filepath.Join(cwd, fmt.Sprintf("%s%s%s%s", "logs/", formatTime, env, ".log")), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		file, err := os.OpenFile(
+			filepath.Join(cwd, fmt.Sprintf("%s%s%s%s", "logs/", formatTime, env, ".log")),
+			os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+			0o666,
+		)
 		if err != nil {
 			log.Info("Failed to log to file, using default stderr")
 			// log.Fatal(err)

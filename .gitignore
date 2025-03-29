@@ -27,3 +27,5 @@ logs
 tmp/*
 
 issues
+
+/lint/

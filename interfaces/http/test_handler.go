@@ -1,10 +1,10 @@
 package http
 
 import (
-	"my-project/usecase"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"my-project/usecase"
 )
 
 type ITestHandler interface {

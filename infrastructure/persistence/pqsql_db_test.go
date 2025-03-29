@@ -14,7 +14,10 @@ func TestNewPostgreSQLDb(t *testing.T) {
 		t.Fatalf("an error %v", err)
 	}
 
-	db.Close()
+	err = db.Close()
+	if err != nil {
+		t.Fatalf("an error %v", err)
+	}
 	tests := []struct {
 		name    string
 		want    *sql.DB
@@ -28,14 +31,14 @@ func TestNewPostgreSQLDb(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewPostgreSQLDb()
+			_, err := NewPostgreSQLDB()
 			if (err != nil) != tt.wantErr {
-				t.Errorf("NewPostgreSQLDb() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("NewPostgreSQLDB() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			// TODO: Fix this test
 			// if !reflect.DeepEqual(got, tt.want) {
-			// 	t.Errorf("NewPostgreSQLDb() = %v, want %v", got, tt.want)
+			// 	t.Errorf("NewPostgreSQLDB() = %v, want %v", got, tt.want)
 			// }
 		})
 	}

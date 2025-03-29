@@ -2,10 +2,10 @@ package configuration
 
 import (
 	"fmt"
-	"my-project/infrastructure/logger"
 	"os"
 
 	"github.com/spf13/viper"
+	"my-project/infrastructure/logger"
 )
 
 type Config struct {

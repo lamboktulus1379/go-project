@@ -1,17 +1,21 @@
 package server
 
 import (
-	"my-project/domain/repository"
-	httpHandler "my-project/interfaces/http"
-	"my-project/interfaces/middleware"
 	"net/http"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"my-project/domain/repository"
+	httpHandler "my-project/interfaces/http"
+	"my-project/interfaces/middleware"
 )
 
-func InitiateRouter(userHandler httpHandler.IUserHandler, testHandler httpHandler.ITestHandler, userRepository repository.IUser) *gin.Engine {
+func InitiateRouter(
+	userHandler httpHandler.IUserHandler,
+	testHandler httpHandler.ITestHandler,
+	userRepository repository.IUser,
+) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(cors.New(cors.Config{

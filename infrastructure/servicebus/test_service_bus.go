@@ -3,9 +3,9 @@ package servicebus
 import (
 	"context"
 	"fmt"
-	"my-project/infrastructure/logger"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
+	"my-project/infrastructure/logger"
 )
 
 type ITestServiceBus interface {
@@ -24,10 +24,19 @@ func NewTestServiceBus(azServiceBusClient *azservicebus.Client) ITestServiceBus 
 func (testServiceBus *TestServicebus) SendMessage(message []byte) error {
 	sender, err := testServiceBus.AzservicebusClient.NewSender("test-queue", nil)
 	if err != nil {
-		logger.GetLogger().WithField("error", err).Error("Error while making new sender service bus.")
+		logger.GetLogger().
+			WithField("error", err).
+			Error("Error while making new sender service bus.")
 		return err
 	}
-	defer sender.Close(context.Background())
+	defer func(sender *azservicebus.Sender, ctx context.Context) {
+		err := sender.Close(ctx)
+		if err != nil {
+			logger.GetLogger().
+				WithField("error", err).
+				Error("Error while closing sender.")
+		}
+	}(sender, context.Background())
 
 	sbMessage := &azservicebus.Message{
 		Body: message,
@@ -46,7 +55,14 @@ func (testServiceBus *TestServicebus) GetMessage(count int) {
 	if err != nil {
 		panic(err)
 	}
-	defer receiver.Close(context.Background())
+	defer func(receiver *azservicebus.Receiver, ctx context.Context) {
+		err := receiver.Close(ctx)
+		if err != nil {
+			logger.GetLogger().
+				WithField("error", err).
+				Error("Error while closing receiver.")
+		}
+	}(receiver, context.Background())
 
 	messages, err := receiver.ReceiveMessages(context.Background(), count, nil)
 	if err != nil {

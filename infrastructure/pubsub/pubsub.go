@@ -7,15 +7,12 @@ import (
 	"cloud.google.com/go/pubsub"
 )
 
-var (
-	topic *pubsub.Topic
+var topic *pubsub.Topic
 
-	// Messages received by this instance.
-	//messagesMu sync.Mutex
-	//messages   []string
-
-	// token is used to verify push requests.
-)
+// Messages received by this instance.
+// messagesMu sync.Mutex
+// messages   []string
+// token is used to verify push requests.
 
 type PubSubHandler struct {
 	Topic        string

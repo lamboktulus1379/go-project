@@ -1,10 +1,10 @@
 package utils
 
 import (
-	"my-project/infrastructure/logger"
 	"time"
 
 	"github.com/golang-jwt/jwt"
+	"my-project/infrastructure/logger"
 )
 
 func GetCurrentTime() time.Time {

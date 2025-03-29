@@ -3,13 +3,13 @@ package persistence
 import (
 	"fmt"
 	"log"
-	"my-project/infrastructure/configuration"
 	"os"
 	"time"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"my-project/infrastructure/configuration"
 )
 
 func NewRepositories() (*gorm.DB, error) {

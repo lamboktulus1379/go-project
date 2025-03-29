@@ -1,15 +1,15 @@
 package tulustech
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+
 	"my-project/infrastructure/clients"
 	"my-project/infrastructure/clients/tulustech/models"
 )
 
 type ITulusHost interface {
-	GetRandomTyping(ctx context.Context, reqHeader models.ReqHeader) (models.ResTypingRandom, error)
+	GetRandomTyping(reqHeader models.ReqHeader) (models.ResTypingRandom, error)
 }
 
 type TulusHost struct {
@@ -20,7 +20,9 @@ func NewTulusHost(host string) ITulusHost {
 	return &TulusHost{host: host}
 }
 
-func (TulusHost *TulusHost) GetRandomTyping(ctx context.Context, reqHeader models.ReqHeader) (models.ResTypingRandom, error) {
+func (TulusHost *TulusHost) GetRandomTyping(
+	reqHeader models.ReqHeader,
+) (models.ResTypingRandom, error) {
 	var res models.ResTypingRandom
 
 	endpoint := "/api/typings/random"
@@ -41,7 +43,7 @@ func (TulusHost *TulusHost) GetRandomTyping(ctx context.Context, reqHeader model
 		return res, err
 	}
 
-	if statusCode < 200 && statusCode > 299 {
+	if statusCode < 200 || statusCode > 299 {
 		return res, fmt.Errorf("something occurred with server")
 	}
 

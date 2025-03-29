@@ -3,24 +3,34 @@ package persistence
 import (
 	"database/sql"
 	"fmt"
-	"my-project/infrastructure/configuration"
-	"my-project/infrastructure/logger"
 	"strconv"
 	"time"
 
 	_ "github.com/lib/pq"
+	"my-project/infrastructure/configuration"
+	"my-project/infrastructure/logger"
 )
 
-func NewPostgreSQLDb() (*sql.DB, error) {
+func NewPostgreSQLDB() (*sql.DB, error) {
 	cfg := configuration.C.Database.Psql
 
 	port, err := strconv.Atoi(cfg.Port)
 	if err != nil {
-		logger.GetLogger().WithField("error", err).WithField("port", cfg.Port).Error("Error while converting postgres port to int")
+		logger.GetLogger().
+			WithField("error", err).
+			WithField("port", cfg.Port).
+			Error("Error while converting postgres port to int")
 		return nil, err
 	}
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable&search_path=public", cfg.User, cfg.Password, cfg.Host, port, cfg.Name)
+	dsn := fmt.Sprintf(
+		"postgres://%s:%s@%s:%d/%s?sslmode=disable&search_path=public",
+		cfg.User,
+		cfg.Password,
+		cfg.Host,
+		port,
+		cfg.Name,
+	)
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
