@@ -8,7 +8,10 @@ import (
 )
 
 func TestNewServiceBus(t *testing.T) {
-	azServiceBusClient, _ := NewServiceBus(context.Background(), "gra-sb-gateway.servicebus.windows.net")
+	azServiceBusClient, _ := NewServiceBus(
+		context.Background(),
+		"gra-sb-gateway.servicebus.windows.net",
+	)
 	type args struct {
 		ctx       context.Context
 		namespace string

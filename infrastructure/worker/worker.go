@@ -4,11 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"my-project/infrastructure/logger"
 	"sync"
 	"time"
 
 	"my-project/domain/model"
+	"my-project/infrastructure/logger"
 )
 
 func PooledWorkError(allData []model.Project, db *sql.DB) {

@@ -5,19 +5,21 @@ import (
 	"crypto/md5"
 	"database/sql"
 	"fmt"
-	"my-project/domain/model"
-	"my-project/mocks/repomocks"
-	"my-project/usecase"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"my-project/domain/model"
+	"my-project/mocks/repomocks"
+	"my-project/usecase"
 )
 
 func TestUserUsecase_RegisterSuccess(t *testing.T) {
 	userRepository := &repomocks.IUser{}
-	userRepository.On("CreateUser", context.Background(), mock.AnythingOfType("model.User")).Return(nil).Once()
+	userRepository.On("CreateUser", context.Background(), mock.AnythingOfType("model.User")).
+		Return(nil).
+		Once()
 
 	userUsecase := usecase.NewUserUsecase(userRepository)
 	response := userUsecase.Register(context.Background(), model.ReqRegister{
@@ -32,7 +34,9 @@ func TestUserUsecase_RegisterSuccess(t *testing.T) {
 
 func TestUserUsecase_RegisterError(t *testing.T) {
 	userRepository := &repomocks.IUser{}
-	userRepository.On("CreateUser", context.Background(), mock.AnythingOfType("model.User")).Return(sql.ErrNoRows).Once()
+	userRepository.On("CreateUser", context.Background(), mock.AnythingOfType("model.User")).
+		Return(sql.ErrNoRows).
+		Once()
 
 	userUsecase := usecase.NewUserUsecase(userRepository)
 	response := userUsecase.Register(context.Background(), model.ReqRegister{
@@ -72,7 +76,9 @@ func TestUserUsecase_LoginSuccess(t *testing.T) {
 
 func TestUserUsecase_LoginUserNotFound(t *testing.T) {
 	userRepository := &repomocks.IUser{}
-	userRepository.On("GetByUserName", context.Background(), mock.Anything).Return(model.User{}, sql.ErrNoRows).Once()
+	userRepository.On("GetByUserName", context.Background(), mock.Anything).
+		Return(model.User{}, sql.ErrNoRows).
+		Once()
 
 	userUsecase := usecase.NewUserUsecase(userRepository)
 

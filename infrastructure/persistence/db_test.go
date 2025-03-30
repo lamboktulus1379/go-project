@@ -17,7 +17,6 @@ func TestNewRepositories(t *testing.T) {
 		Conn:                      db,
 		SkipInitializeWithVersion: true,
 	}), &gorm.Config{})
-
 	if err != nil {
 		t.Fatalf("an error %v", err)
 	}
