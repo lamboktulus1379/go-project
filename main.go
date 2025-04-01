@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -145,7 +146,7 @@ func main() {
 			ReadTimeout:  0,
 			WriteTimeout: 0,
 		}
-		if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {
+		if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			return err
 		}
 		logger.GetLogger().WithField("port", port).Error("Application start")

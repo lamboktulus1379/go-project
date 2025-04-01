@@ -112,7 +112,7 @@ linters:
     - zerologlint
   # Disable specific linter
   # https://golangci-lint.run/usage/linters/#disabled-by-default
-  disable:
+#  disable:
     - asasalint
     - asciicheck
     - bidichk
@@ -349,7 +349,7 @@ formatters:
   # Default: false
   fix: true
 # Output configuration options.
-output:
+#output:
   # The formats used to render issues.
   formats:
     # Prints issues in a text format with colors, line number, and linter name.
@@ -518,4 +518,6 @@ severity:
   rules:
     - linters:
         - dupl
-      severity: info
+      severity: "error"
+    - pattern:
+        - ".*"
