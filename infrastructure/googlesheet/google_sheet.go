@@ -79,7 +79,7 @@ func saveToken(path string, token *oauth2.Token) {
 	}(f)
 	err = json.NewEncoder(f).Encode(token)
 	if err != nil {
-		logger.GetLogger().Error("Unable to encode oauth token: %v", err)
+		logger.GetLogger().WithField("error", err).Error("Unable to encode oauth token")
 	}
 }
 

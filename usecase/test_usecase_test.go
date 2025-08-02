@@ -142,26 +142,7 @@ func TestTestUsecase_Test_PubSubError(t *testing.T) {
 		Return("", assert.AnError).
 		Once()
 
-	// ServiceBus expectations
-	mockTestServiceBus.On("SendMessage", byteMsg).
-		Return(nil).
-		Once()
-
-	// Cache expectations
-	mockTestCache.On("Set", mock.Anything, "test", "test").
-		Once()
-	mockTestCache.On("Get", mock.Anything, "test").
-		Return("test", nil).
-		Once()
-
-	// TulusTechHost expectations
-	mockTulusTechHost.On("GetRandomTyping", mock.AnythingOfType("models.ReqHeader")).
-		Return(models.ResTypingRandom{
-			ID:      "1",
-			Author:  "Test Author",
-			Content: "Test Content",
-		}, nil).
-		Once()
+	// No ServiceBus, Cache, or TulusTech expectations because the function returns early on PubSub error
 
 	// Create the usecase with mocks
 	testUsecase := usecase.NewTestUsecase(
@@ -175,11 +156,14 @@ func TestTestUsecase_Test_PubSubError(t *testing.T) {
 	result := testUsecase.Test(context.Background())
 
 	// Assert the result
-	// Note: The implementation always sets PubSub to "OK" even if there's an error
-	assert.Equal(t, "OK", result.PubSub)
-	assert.Equal(t, "OK", result.ServiceBus)
-	assert.Equal(t, "test", result.Cache)
-	assert.Equal(t, "OK", result.TulusTech)
+	// The implementation now returns the error message when there's an error
+	assert.Equal(t, assert.AnError.Error(), result.PubSub)
+
+	// These assertions are not reached because the function returns early on PubSub error
+	// But we'll keep them for completeness
+	// assert.Equal(t, "OK", result.ServiceBus)
+	// assert.Equal(t, "test", result.Cache)
+	// assert.Equal(t, "OK", result.TulusTech)
 
 	// Verify all expectations were met
 	mockTulusTechHost.AssertExpectations(t)
@@ -209,21 +193,7 @@ func TestTestUsecase_Test_ServiceBusError(t *testing.T) {
 		Return(assert.AnError).
 		Once()
 
-	// Cache expectations
-	mockTestCache.On("Set", mock.Anything, "test", "test").
-		Once()
-	mockTestCache.On("Get", mock.Anything, "test").
-		Return("test", nil).
-		Once()
-
-	// TulusTechHost expectations
-	mockTulusTechHost.On("GetRandomTyping", mock.AnythingOfType("models.ReqHeader")).
-		Return(models.ResTypingRandom{
-			ID:      "1",
-			Author:  "Test Author",
-			Content: "Test Content",
-		}, nil).
-		Once()
+	// No Cache or TulusTech expectations because the function returns early on ServiceBus error
 
 	// Create the usecase with mocks
 	testUsecase := usecase.NewTestUsecase(
@@ -238,10 +208,13 @@ func TestTestUsecase_Test_ServiceBusError(t *testing.T) {
 
 	// Assert the result
 	assert.Equal(t, "OK", result.PubSub)
-	// Note: The implementation always sets ServiceBus to "OK" even if there's an error
-	assert.Equal(t, "OK", result.ServiceBus)
-	assert.Equal(t, "test", result.Cache)
-	assert.Equal(t, "OK", result.TulusTech)
+	// The implementation now returns the error message when there's an error
+	assert.Equal(t, assert.AnError.Error(), result.ServiceBus)
+
+	// These assertions are not reached because the function returns early on ServiceBus error
+	// But we'll keep them for completeness
+	// assert.Equal(t, "test", result.Cache)
+	// assert.Equal(t, "OK", result.TulusTech)
 
 	// Verify all expectations were met
 	mockTulusTechHost.AssertExpectations(t)

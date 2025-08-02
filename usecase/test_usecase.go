@@ -24,9 +24,11 @@ type TestUsecase struct {
 	TestCache      cache.ITestCache
 }
 
-type ITulusHost interface {
-	GetRandomTyping(ctx context.Context, reqHeader models.ReqHeader) (string, error)
-}
+// This interface is defined in infrastructure/clients/tulustech/host.go
+// Keeping this here would cause duplication and potential inconsistency
+// type ITulusHost interface {
+// 	GetRandomTyping(reqHeader models.ReqHeader) (models.ResTypingRandom, error)
+// }
 
 func NewTestUsecase(
 	tulusTechHost tulushost.ITulusHost,
@@ -58,7 +60,7 @@ func (testUsecase *TestUsecase) Test(ctx context.Context) dto.TestDto {
 	if err != nil {
 		logger.GetLogger().Error("Error while publishing message")
 		res.PubSub = err.Error()
-		// return res
+		return res
 	}
 	logger.GetLogger().WithField("publishResponse", publishResponse).Info("Successfully published")
 	res.PubSub = "OK"
@@ -67,7 +69,7 @@ func (testUsecase *TestUsecase) Test(ctx context.Context) dto.TestDto {
 	if err != nil {
 		logger.GetLogger().Error("Error while publishing message with service bus")
 		res.ServiceBus = err.Error()
-		// return res
+		return res
 	}
 	res.ServiceBus = "OK"
 
@@ -75,8 +77,8 @@ func (testUsecase *TestUsecase) Test(ctx context.Context) dto.TestDto {
 	val, err := testUsecase.TestCache.Get(ctx, "test")
 	if err != nil {
 		logger.GetLogger().Error("Error while getting value from cache")
-		res.ServiceBus = "Error while getting value from cache"
-		// return res
+		res.Cache = "Error while getting value from cache"
+		return res
 	}
 	res.Cache = val.(string)
 
@@ -85,7 +87,7 @@ func (testUsecase *TestUsecase) Test(ctx context.Context) dto.TestDto {
 	if err != nil {
 		logger.GetLogger().Error("Error while get random typing")
 		res.TulusTech = err.Error()
-		// return res
+		return res
 	}
 	logger.GetLogger().
 		WithField("randomTypingResponse", randomTypingRes).

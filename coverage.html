@@ -1,0 +1,2375 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>cache: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">my-project/infrastructure/cache/cache.go (0.0%)</option>
+				
+				<option value="file1">my-project/infrastructure/cache/test_cache.go (20.0%)</option>
+				
+				<option value="file2">my-project/infrastructure/clients/host.init.go (0.0%)</option>
+				
+				<option value="file3">my-project/infrastructure/clients/tulustech/host.go (7.1%)</option>
+				
+				<option value="file4">my-project/infrastructure/configuration/config.go (73.3%)</option>
+				
+				<option value="file5">my-project/infrastructure/filecsv/file.go (0.0%)</option>
+				
+				<option value="file6">my-project/infrastructure/filecsv/validate_csv.go (0.0%)</option>
+				
+				<option value="file7">my-project/infrastructure/filecsv/validate_file.go (0.0%)</option>
+				
+				<option value="file8">my-project/infrastructure/googlesheet/google_sheet.go (0.0%)</option>
+				
+				<option value="file9">my-project/infrastructure/logger/logger.go (0.0%)</option>
+				
+				<option value="file10">my-project/infrastructure/persistence/db.go (0.0%)</option>
+				
+				<option value="file11">my-project/infrastructure/persistence/mongo_db.go (0.0%)</option>
+				
+				<option value="file12">my-project/infrastructure/persistence/native_db.go (88.9%)</option>
+				
+				<option value="file13">my-project/infrastructure/persistence/pqsql_db.go (0.0%)</option>
+				
+				<option value="file14">my-project/infrastructure/persistence/test_repository.go (0.0%)</option>
+				
+				<option value="file15">my-project/infrastructure/persistence/user_repository.go (68.2%)</option>
+				
+				<option value="file16">my-project/infrastructure/pubsub/pubsub.go (0.0%)</option>
+				
+				<option value="file17">my-project/infrastructure/pubsub/test_pubsub.go (5.6%)</option>
+				
+				<option value="file18">my-project/infrastructure/servicebus/service_bus.go (71.4%)</option>
+				
+				<option value="file19">my-project/infrastructure/servicebus/test_service_bus.go (3.2%)</option>
+				
+				<option value="file20">my-project/infrastructure/utils/util.go (12.5%)</option>
+				
+				<option value="file21">my-project/infrastructure/worker/worker.go (0.0%)</option>
+				
+				<option value="file22">my-project/interfaces/http/test_handler.go (0.0%)</option>
+				
+				<option value="file23">my-project/interfaces/http/user_handler.go (0.0%)</option>
+				
+				<option value="file24">my-project/interfaces/middleware/auth.go (0.0%)</option>
+				
+				<option value="file25">my-project/main.go (0.0%)</option>
+				
+				<option value="file26">my-project/mocks/repomocks/user.go (0.0%)</option>
+				
+				<option value="file27">my-project/server/router.go (0.0%)</option>
+				
+				<option value="file28">my-project/usecase/test_usecase.go (78.9%)</option>
+				
+				<option value="file29">my-project/usecase/user_usecase.go (90.9%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package cache
+
+import (
+        "context"
+        "fmt"
+
+        "github.com/redis/go-redis/v9"
+)
+
+func NewCache(ctx context.Context, addr, username, password string) (*redis.Client, error) <span class="cov0" title="0">{
+        rds := redis.NewClient(&amp;redis.Options{
+                Addr:     addr,
+                Username: username,
+                Password: password,
+                DB:       0,
+        })
+
+        _, err := rds.Ping(ctx).Result()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">fmt.Println("Redis connected")
+        return rds, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package cache
+
+import (
+        "context"
+        "time"
+
+        "github.com/redis/go-redis/v9"
+        "my-project/infrastructure/logger"
+)
+
+type ITestCache interface {
+        Set(ctx context.Context, key string, value interface{})
+        Get(ctx context.Context, key string) (interface{}, error)
+}
+
+type TestCache struct {
+        RedisClient *redis.Client
+}
+
+func NewTestCache(redisClient *redis.Client) ITestCache <span class="cov8" title="1">{
+        return &amp;TestCache{RedisClient: redisClient}
+}</span>
+
+func (c *TestCache) Set(ctx context.Context, key string, value interface{}) <span class="cov0" title="0">{
+        err := c.RedisClient.Set(ctx, key, value, time.Second*30)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while save redis")
+        }</span>
+}
+
+func (c *TestCache) Get(ctx context.Context, key string) (interface{}, error) <span class="cov0" title="0">{
+        return c.RedisClient.Get(ctx, key).Result()
+}</span>
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package clients
+
+import (
+        "bytes"
+        "encoding/json"
+        "fmt"
+        "io"
+        "log"
+        "net/http"
+        "os"
+        "time"
+
+        "github.com/google/go-querystring/query"
+        "my-project/infrastructure/logger"
+)
+
+const (
+        ErrorReadingRequest = "Error reading request."
+)
+
+// HostInterface abstract class
+type HostInterface interface {
+        HTTPPost() ([]byte, int, error)
+        HTTPGet() ([]byte, int, error)
+        HTTPPatch() ([]byte, int, error)
+
+        Do(req *http.Request) ([]byte, int, error)
+}
+
+// HostStruct actual class implementation
+type HostStruct struct {
+        Host       string
+        Endpoint   string
+        Method     string
+        Data       interface{}
+        Header     map[string]string
+        QueryParam interface{}
+
+        HTTPClient   *http.Client
+        HTTPRequest  *http.Request
+        HTTPResponse *http.Response
+
+        Err error
+}
+
+// NewHost return struct that will implement the abstract class
+func NewHost(
+        host string,
+        endpoint string,
+        method string,
+        data interface{},
+        header map[string]string,
+        queryParam interface{},
+) HostInterface <span class="cov0" title="0">{
+        return &amp;HostStruct{
+                Host:       host,
+                Endpoint:   endpoint,
+                Method:     method,
+                Data:       data,
+                Header:     header,
+                QueryParam: queryParam,
+        }
+}</span>
+
+// HTTPPost
+func (host *HostStruct) HTTPPost() ([]byte, int, error) <span class="cov0" title="0">{
+        dataByte, _ := json.Marshal(host.Data)
+        dataByteBuffer := bytes.NewBuffer(dataByte)
+        req, err := http.NewRequest("POST", host.Host+host.Endpoint, dataByteBuffer)
+        if host.Data == nil </span><span class="cov0" title="0">{
+                req, err = http.NewRequest("POST", host.Host+host.Endpoint, nil)
+        }</span>
+
+        <span class="cov0" title="0">if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().
+                        WithField("request", req).
+                        WithField("error", err).
+                        Info("Error while post")
+                log.Fatal(ErrorReadingRequest, err)
+                return nil, 500, err
+        }</span>
+
+        // Send request
+        <span class="cov0" title="0">resp, statusCode, err := host.Do(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, statusCode, err
+        }</span>
+
+        <span class="cov0" title="0">return resp, statusCode, nil</span>
+}
+
+// HTTPGet
+func (host *HostStruct) HTTPGet() ([]byte, int, error) <span class="cov0" title="0">{
+        req, err := http.NewRequest("GET", host.Host+host.Endpoint, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(ErrorReadingRequest, err)
+        }</span>
+        // Send request
+        <span class="cov0" title="0">resp, statusCode, err := host.Do(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, statusCode, err
+        }</span>
+
+        <span class="cov0" title="0">return resp, statusCode, nil</span>
+}
+
+// HTTPPatch
+func (host *HostStruct) HTTPPatch() ([]byte, int, error) <span class="cov0" title="0">{
+        dataByte, _ := json.Marshal(host.Data)
+        req, err := http.NewRequest("PUT", host.Host+host.Endpoint, bytes.NewBuffer(dataByte))
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(ErrorReadingRequest, err)
+        }</span>
+        // Send request
+        <span class="cov0" title="0">resp, statusCode, err := host.Do(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, statusCode, err
+        }</span>
+
+        <span class="cov0" title="0">return resp, statusCode, nil</span>
+}
+
+// Do request
+func (host *HostStruct) Do(req *http.Request) ([]byte, int, error) <span class="cov0" title="0">{
+        for key, val := range host.Header </span><span class="cov0" title="0">{
+                req.Header.Set(key, val)
+        }</span>
+
+        // Set headers
+        <span class="cov0" title="0">req.Header.Set("Content-Type", "application/json")
+
+        if host.QueryParam != nil </span><span class="cov0" title="0">{
+                v, _ := query.Values(host.QueryParam)
+                req.URL.RawQuery = v.Encode()
+        }</span>
+
+        // Validate cookie and headers are attached
+        // fmt.Println(req.Cookies())
+        <span class="cov0" title="0">logger.GetLogger().
+                WithField("host", host.Host+host.Endpoint).
+                WithField("headers", req.Header).
+                WithField("request", req.Body).
+                WithField("method", host.Method).
+                Info("Client request")
+
+        // Set client timeout
+        tr := &amp;http.Transport{
+                MaxIdleConns:        100,
+                MaxIdleConnsPerHost: 100,
+                MaxConnsPerHost:     100,
+                IdleConnTimeout:     600 * time.Second,
+        }
+        host.HTTPClient = &amp;http.Client{Timeout: time.Second * 20, Transport: tr}
+
+        host.HTTPResponse, host.Err = host.HTTPClient.Do(req)
+        if os.IsTimeout(host.Err) </span><span class="cov0" title="0">{
+                return nil, 0, host.Err
+        }</span>
+        <span class="cov0" title="0">if host.Err != nil </span><span class="cov0" title="0">{
+                fmt.Println("Error reading response. ", host.Err)
+                return nil, 0, host.Err
+        }</span>
+        <span class="cov0" title="0">defer func(Body io.ReadCloser) </span><span class="cov0" title="0">{
+                err := Body.Close()
+                if err != nil </span><span class="cov0" title="0">{
+                        logger.GetLogger().
+                                WithField("error", err).
+                                Error("Error while closing body")
+                }</span>
+        }(host.HTTPResponse.Body)
+
+        <span class="cov0" title="0">body, err := io.ReadAll(host.HTTPResponse.Body)
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Println("Error network. ", err)
+                return nil, 0, err
+        }</span>
+        <span class="cov0" title="0">logger.GetLogger().
+                WithField("status", host.HTTPResponse.Status).
+                WithField("headers", host.HTTPResponse.Header).
+                WithField("body", string(body)).
+                Info("Client response")
+
+        return body, host.HTTPResponse.StatusCode, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package tulustech
+
+import (
+        "encoding/json"
+        "fmt"
+
+        "my-project/infrastructure/clients"
+        "my-project/infrastructure/clients/tulustech/models"
+)
+
+type ITulusHost interface {
+        GetRandomTyping(reqHeader models.ReqHeader) (models.ResTypingRandom, error)
+}
+
+type TulusHost struct {
+        host string
+}
+
+func NewTulusHost(host string) ITulusHost <span class="cov8" title="1">{
+        return &amp;TulusHost{host: host}
+}</span>
+
+func (TulusHost *TulusHost) GetRandomTyping(
+        reqHeader models.ReqHeader,
+) (models.ResTypingRandom, error) <span class="cov0" title="0">{
+        var res models.ResTypingRandom
+
+        endpoint := "/api/typings/random"
+        method := "POST"
+
+        reqMapHeader := map[string]string{
+                "Accept":       reqHeader.Accept,
+                "Content-Type": reqHeader.ContentType,
+                "Cookie":       reqHeader.Cookie,
+        }
+        hostClient := clients.NewHost(TulusHost.host, endpoint, method, nil, reqMapHeader, nil)
+        byteData, statusCode, err := hostClient.HTTPPost()
+        if err != nil </span><span class="cov0" title="0">{
+                return res, err
+        }</span>
+
+        <span class="cov0" title="0">if err := json.Unmarshal(byteData, &amp;res); err != nil </span><span class="cov0" title="0">{
+                return res, err
+        }</span>
+
+        <span class="cov0" title="0">if statusCode &lt; 200 || statusCode &gt; 299 </span><span class="cov0" title="0">{
+                return res, fmt.Errorf("something occurred with server")
+        }</span>
+
+        <span class="cov0" title="0">return res, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package configuration
+
+import (
+        "fmt"
+        "os"
+
+        "github.com/spf13/viper"
+        "my-project/infrastructure/logger"
+)
+
+type Config struct {
+        Database    Database    `json:"database"`
+        TulusTech   TulusTech   `json:"tulusTech"`
+        App         App         `json:"app"`
+        GoogleSheet GoogleSheet `json:"googleSheet"`
+        Data        Data        `json:"data"`
+        Pubsub      Pubsub      `json:"pubsub"`
+        ServiceBus  ServiceBus  `json:"serviceBus"`
+        RedisClient RedisClient `json:"redisClient"`
+        Logger      Logger      `json:"logger"`
+}
+
+type App struct {
+        Port      int    `json:"port"`
+        SecretKey string `json:"secretKey"`
+}
+
+type Database struct {
+        Psql  Db `json:"psql"`
+        MySql Db `json:"mysql"`
+        Mongo Db `json:"mongo"`
+}
+
+type GoogleSheet struct {
+        Type                       int    `json:"type"`
+        SpreadsheetId              string `json:"spreadsheetId"`
+        SpreadsheetColumnReadRange string `json:"spreadsheetColumnReadRange"`
+        SpreadsheetName            string `json:"spreadsheetName"`
+        SpreadsheetDescription     string `json:"spreadsheetDescription"`
+}
+
+type Db struct {
+        Name     string `json:"string"`
+        Host     string `json:"host"`
+        Port     string `json:"port"`
+        User     string `json:"user"`
+        Password string `json:"password"`
+}
+
+type TulusTech struct {
+        Header Header `json:"header"`
+        Host   string `json:"host"`
+}
+
+type Data struct {
+        Source string `json:"source"`
+}
+
+type Header struct {
+        Accept          string `json:"accept"`
+        AcceptLanguage  string `json:"acceptLanguage"`
+        Connection      string `json:"connection"`
+        ContentType     string `json:"contentType"`
+        Cookie          string `json:"cookie"`
+        Origin          string `json:"origin"`
+        Referer         string `json:"referer"`
+        SecFetchDest    string `json:"secFetchDest"`
+        SecFetchMode    string `json:"secFetchMode"`
+        SectFetchSite   string `json:"secFetchSite"`
+        UserAgent       string `json:"userAgent"`
+        XRequestedWith  string `json:"xRequestedWith"`
+        SecChUa         string `json:"secChUa"`
+        SecChUaMobile   string `json:"secChUaMobile"`
+        SecChUaPlatform string `json:"secChUaPlatform"`
+}
+
+type Pubsub struct {
+        ProjectID string `json:"projectID"`
+}
+
+type ServiceBus struct {
+        Namespace string `json:"namespace"`
+}
+
+type RedisClient struct {
+        Host         string `json:"host"`
+        Port         string `json:"port"`
+        Password     string `json:"password"`
+        DatabaseName string `json:"databaseName"`
+        Username     string `json:"username"`
+}
+
+type Logger struct {
+        Format string `json:"format"`
+}
+
+var C Config
+
+func init() <span class="cov8" title="1">{
+        LoadConfig()
+        initDatabase(&amp;C)
+}</span>
+
+func LoadConfig() <span class="cov8" title="1">{
+        name := getConfig()
+        viper.SetConfigName(name)
+        viper.SetConfigType("json")
+        viper.AddConfigPath(".")
+        viper.AddConfigPath("../")
+        viper.AddConfigPath("../../")
+        viper.AutomaticEnv()
+
+        if err := viper.ReadInConfig(); err != nil </span><span class="cov0" title="0">{
+                if _, ok := err.(viper.ConfigFileNotFoundError); ok </span><span class="cov0" title="0">{
+                        // Config file not found; ignore error if desired
+                        fmt.Println("Config file not found")
+                }</span> else<span class="cov0" title="0"> {
+                        // Config file was found but another error was produced
+                        fmt.Println("An error occurred. ", err)
+                }</span>
+        }
+
+        <span class="cov8" title="1">logger.GetLogger().WithField("config", name).Info("Config set up successfully")
+        // Config file found and successfully parsed
+        if err := viper.Unmarshal(&amp;C); err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Viper unable to decode into struct")
+        }</span>
+}
+
+func getConfig() string <span class="cov8" title="1">{
+        name := "config"
+        env := os.Getenv("ENV")
+        if env != "" </span><span class="cov8" title="1">{
+                name = fmt.Sprintf("%s-%s", name, env)
+        }</span>
+        <span class="cov8" title="1">return name</span>
+}
+
+func initDatabase(C *Config) <span class="cov8" title="1">{
+        logger.GetLogger().WithField("Database", C.Database.Psql).Info("Database configuration")
+        if C.Database.Psql.Name == "" </span><span class="cov0" title="0">{
+                C.Database.Psql.Name = os.Getenv("DB_NAME")
+        }</span>
+        <span class="cov8" title="1">if C.Database.Psql.Host == "" </span><span class="cov0" title="0">{
+                C.Database.Psql.Host = os.Getenv("DB_HOST")
+        }</span>
+        <span class="cov8" title="1">if C.Database.Psql.Password == "" </span><span class="cov0" title="0">{
+                C.Database.Psql.Password = os.Getenv("DB_PASSWORD")
+        }</span>
+        <span class="cov8" title="1">if C.Database.Psql.Port == "" </span><span class="cov0" title="0">{
+                C.Database.Psql.Port = os.Getenv("DB_PORT")
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package filecsv
+
+import (
+        "os"
+
+        "my-project/infrastructure/logger"
+)
+
+func NewFile(path string) (*os.File, error) <span class="cov0" title="0">{
+        file, err := os.OpenFile(path, os.O_RDWR, 0o644)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while open file")
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return file, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package filecsv
+
+import (
+        "encoding/csv"
+        "fmt"
+        "io"
+        "os"
+
+        "my-project/infrastructure/logger"
+)
+
+type IValidateCsvInterface interface {
+        AppendAllData(data [][]string)
+        AppendData(data []string)
+        ReadData() ([]string, error)
+        Close()
+}
+
+type ValidateCsv struct {
+        File *os.File
+}
+
+func NewValidateCsv(file *os.File) IValidateCsvInterface <span class="cov0" title="0">{
+        return &amp;ValidateCsv{File: file}
+}</span>
+
+func (validateCsv *ValidateCsv) AppendData(data []string) <span class="cov0" title="0">{
+        w := csv.NewWriter(validateCsv.File)
+        err := w.Write(data)
+        if err != nil </span><span class="cov0" title="0">{
+                return
+        }</span>
+
+        <span class="cov0" title="0">if err := w.Error(); err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while AppendData to CSV")
+        }</span>
+        <span class="cov0" title="0">fmt.Println("Appending succeed")</span>
+}
+
+func (validateCsv *ValidateCsv) AppendAllData(data [][]string) <span class="cov0" title="0">{
+        w := csv.NewWriter(validateCsv.File)
+        err := w.WriteAll(data)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while AppendAllData to CSV")
+        }</span>
+
+        <span class="cov0" title="0">if err := w.Error(); err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while AppendAllData to CSV")
+        }</span>
+        <span class="cov0" title="0">fmt.Println("Appending all succeed")</span>
+}
+
+func (validateCsv *ValidateCsv) ReadData() ([]string, error) <span class="cov0" title="0">{
+        var refNumbers []string
+
+        r := csv.NewReader(validateCsv.File)
+
+        // defer validateCsv.File.Close()
+
+        // Iterate through the records
+        for </span><span class="cov0" title="0">{
+                // Read each record from csv
+                record, err := r.Read()
+                if err == io.EOF </span><span class="cov0" title="0">{
+                        break</span>
+                }
+                <span class="cov0" title="0">if err != nil </span><span class="cov0" title="0">{
+                        logger.GetLogger().WithField("error", err).Error("Error while reading CSV file")
+                        return nil, err
+                }</span>
+                <span class="cov0" title="0">refNumbers = append(refNumbers, record[0])</span>
+        }
+        <span class="cov0" title="0">logger.GetLogger().WithField("refNumbers", refNumbers).Info("Ref Numbers from CSV")
+        return refNumbers, nil</span>
+}
+
+func (validateCsv *ValidateCsv) Close() <span class="cov0" title="0">{
+        defer func(File *os.File) </span><span class="cov0" title="0">{
+                err := File.Close()
+                if err != nil </span><span class="cov0" title="0">{
+                        logger.GetLogger().WithField("error", err).Error("Error while closing CSV file")
+                }</span>
+        }(validateCsv.File)
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package filecsv
+
+import (
+        "fmt"
+        "os"
+)
+
+type IValidateFile interface {
+        AppendAllData(data [][]string)
+        AppendData(data []string)
+        ReadData() ([]string, error)
+        Close()
+}
+
+type ValidateFile struct {
+        File *os.File
+}
+
+func NewValidateFile(file *os.File) IValidateFile <span class="cov0" title="0">{
+        return &amp;ValidateFile{File: file}
+}</span>
+
+func (validateFile *ValidateFile) AppendData(data []string) <span class="cov0" title="0">{
+        _, err := validateFile.File.WriteString(data[0] + "\n")
+        if err != nil </span><span class="cov0" title="0">{
+                return
+        }</span>
+}
+
+func (validateFile *ValidateFile) AppendAllData(data [][]string) <span class="cov0" title="0">{
+        for _, row := range data </span><span class="cov0" title="0">{
+                writeString, err := validateFile.File.WriteString(row[0] + "\n")
+                if err != nil </span><span class="cov0" title="0">{
+                        return
+                }</span>
+                <span class="cov0" title="0">fmt.Println(string(rune(writeString)))</span>
+        }
+}
+
+func (validateFile *ValidateFile) ReadData() ([]string, error) <span class="cov0" title="0">{
+        var refNumbers []string
+
+        // defer validateFile.File.Close()
+
+        // Iterate through the records
+        for </span><span class="cov0" title="0">{
+                // Read each record from csv
+                record := make([]byte, 10)
+                _, err := validateFile.File.Read(record)
+                if err != nil </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                <span class="cov0" title="0">refNumbers = append(refNumbers, string(record))</span>
+        }
+
+        <span class="cov0" title="0">return refNumbers, nil</span>
+}
+
+func (validateFile *ValidateFile) Close() <span class="cov0" title="0">{
+        err := validateFile.File.Close()
+        if err != nil </span><span class="cov0" title="0">{
+                return
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package googlesheet
+
+import (
+        "context"
+        "encoding/json"
+        "fmt"
+        "log"
+        "net/http"
+        "os"
+
+        "golang.org/x/oauth2"
+        "golang.org/x/oauth2/google"
+        "google.golang.org/api/option"
+        "google.golang.org/api/sheets/v4"
+        "my-project/infrastructure/logger"
+)
+
+// Retrieve a token, saves the token, then returns the generated client.
+func getClient(config *oauth2.Config) *http.Client <span class="cov0" title="0">{
+        // The file token.json stores the user's access and refresh tokens, and is
+        // created automatically when the authorization flow completes for the first
+        // time.
+        tokFile := "token.json"
+        tok, err := tokenFromFile(tokFile)
+        if err != nil </span><span class="cov0" title="0">{
+                tok = getTokenFromWeb(config)
+                saveToken(tokFile, tok)
+        }</span>
+        <span class="cov0" title="0">return config.Client(context.Background(), tok)</span>
+}
+
+// Request a token from the web, then returns the retrieved token.
+func getTokenFromWeb(config *oauth2.Config) *oauth2.Token <span class="cov0" title="0">{
+        authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+        fmt.Printf("Go to the following link in your browser then type the "+
+                "authorization code: \n%v\n", authURL)
+
+        var authCode string
+        if _, err := fmt.Scan(&amp;authCode); err != nil </span><span class="cov0" title="0">{
+                log.Printf("Unable to read authorization code: %v\n", err)
+        }</span>
+
+        <span class="cov0" title="0">tok, err := config.Exchange(context.TODO(), authCode)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Printf("Unable to retrieve token from web: %v\n", err)
+        }</span>
+        <span class="cov0" title="0">return tok</span>
+}
+
+// Retrieves a token from a local file.
+func tokenFromFile(file string) (*oauth2.Token, error) <span class="cov0" title="0">{
+        f, err := os.Open(file)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">defer func(f *os.File) </span><span class="cov0" title="0">{
+                err := f.Close()
+                if err != nil </span><span class="cov0" title="0">{
+                        logger.GetLogger().WithField("error", err).Error("Error closing file")
+                }</span>
+        }(f)
+        <span class="cov0" title="0">tok := &amp;oauth2.Token{}
+        err = json.NewDecoder(f).Decode(tok)
+        return tok, err</span>
+}
+
+// Saves a token to a file path.
+func saveToken(path string, token *oauth2.Token) <span class="cov0" title="0">{
+        fmt.Printf("Saving credential file to: %s\n", path)
+        f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o600)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Printf("Unable to cache oauth token: %v\n", err)
+        }</span>
+        <span class="cov0" title="0">defer func(f *os.File) </span><span class="cov0" title="0">{
+                err := f.Close()
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Printf("Error closing file: %v\n", err)
+                }</span>
+        }(f)
+        <span class="cov0" title="0">err = json.NewEncoder(f).Encode(token)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Unable to encode oauth token")
+        }</span>
+}
+
+func NewGoogleSheet() (*sheets.Service, error) <span class="cov0" title="0">{
+        ctx := context.Background()
+        b, err := os.ReadFile("credentials.json")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Printf("Unable to read client secret file: %v\n", err)
+                return nil, err
+        }</span>
+
+        // If modifying these scopes, delete your previously saved token.json.
+        <span class="cov0" title="0">config, err := google.ConfigFromJSON(b, "https://www.googleapis.com/auth/spreadsheets")
+        if err != nil </span><span class="cov0" title="0">{
+                log.Printf("Unable to parse client secret file to config: %v\n", err)
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">client := getClient(config)
+        log.Printf("%s", "Processing connected to Google PubSub")
+        srv, err := sheets.NewService(ctx, option.WithHTTPClient(client))
+        if err != nil </span><span class="cov0" title="0">{
+                log.Printf("Unable to retrieve Sheets client: %v\n", err)
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">log.Printf("%s", "Google Sheet connected...")
+        return srv, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">package logger
+
+import (
+        "fmt"
+        "os"
+        "path/filepath"
+        "runtime"
+        "time"
+
+        log "github.com/sirupsen/logrus"
+)
+
+var logger = log.New()
+
+func init() <span class="cov0" title="0">{
+        // Get current working directory
+        cwd, err := os.Getwd()
+        if err != nil </span><span class="cov0" title="0">{
+                log.Info("Failed get current working directory")
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">layout := "2006-01-02"
+        env := os.Getenv("ENV")
+        fmt.Println("ENV", env)
+        formatTime := time.Now().Format(layout)
+        // file, err := os.OpenFile(filepath.Join(cwd, fmt.Sprintf("%s%s-%s%s", "logs/", formatTime, env, ".log")), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+        if env == "stage" </span><span class="cov0" title="0">{
+                logger.Out = os.Stdout
+        }</span>
+        <span class="cov0" title="0">if env == "prod" || env == "" </span><span class="cov0" title="0">{
+                file, err := os.OpenFile(
+                        filepath.Join(cwd, fmt.Sprintf("%s%s%s%s", "logs/", formatTime, env, ".log")),
+                        os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+                        0o666,
+                )
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Info("Failed to log to file, using default stderr")
+                        // log.Fatal(err)
+                }</span>
+                <span class="cov0" title="0">logger.Out = file</span>
+        }
+
+        <span class="cov0" title="0">logger.Formatter = &amp;log.JSONFormatter{
+                TimestampFormat: time.RFC3339Nano,
+        }
+        logger.SetLevel(log.DebugLevel)</span>
+}
+
+func GetLogger() *log.Entry <span class="cov0" title="0">{
+        // The API for setting attributes is a little different than the package level
+        // exported logger. See Godoc.
+        // log.Out = os.Stdout
+
+        // You could set this to any `io.Writer` such as a file
+        // file, err := os.OpenFile("log.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+        // if err == nil {
+        //  log.Out = file
+        // } else {
+        //  log.Info("Failed to log to file, using default stderr")
+        // }
+        function, file, line, _ := runtime.Caller(1)
+
+        functionObject := runtime.FuncForPC(function)
+        entry := logger.WithFields(log.Fields{
+                "requestId": time.Now().UnixNano() / int64(time.Millisecond),
+                "size":      10,
+                "function":  functionObject.Name(),
+                "file":      file,
+                "line":      line,
+        })
+
+        return entry
+}</span>
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">package persistence
+
+import (
+        "fmt"
+        "log"
+        "os"
+        "time"
+
+        "gorm.io/driver/mysql"
+        "gorm.io/gorm"
+        "gorm.io/gorm/logger"
+        "my-project/infrastructure/configuration"
+)
+
+func NewRepositories() (*gorm.DB, error) <span class="cov0" title="0">{
+        cfg := configuration.C.Database.MySql
+
+        dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&amp;parseTime=True&amp;loc=Local",
+                cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Name)
+
+        db, err := gorm.Open(mysql.Open(dsn), &amp;gorm.Config{
+                Logger: logger.New(
+                        log.New(os.Stdout, "\r\n", log.LstdFlags), // io writer
+                        logger.Config{
+                                SlowThreshold:             time.Second, // Slow SQL threshold
+                                LogLevel:                  logger.Info, // Log level
+                                IgnoreRecordNotFoundError: true,        // Ignore ErrRecordNotFound error for logger
+                                Colorful:                  true,        // Disable color
+                        },
+                ),
+        })
+        if err != nil </span><span class="cov0" title="0">{
+                log.Printf("%s: %v", "ERROR: ", err.Error())
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">log.Printf("INFO: Connected to DB")
+        // db.AutoMigrate(&amp;model.User{})
+        return db, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file11" style="display: none">package persistence
+
+import (
+        "go.mongodb.org/mongo-driver/v2/mongo"
+        "go.mongodb.org/mongo-driver/v2/mongo/options"
+        "my-project/infrastructure/logger"
+)
+
+func NewMongoDb(
+        host string,
+        port string,
+        username string,
+        password string,
+        database string,
+) (*mongo.Client, error) <span class="cov0" title="0">{
+        // connect to mongodb
+        client, err := mongo.Connect(
+                options.Client().
+                        ApplyURI("mongodb://" + username + ":" + password + "@" + host + ":" + port + "/" + database + "s?authSource=admin&amp;authMechanism=SCRAM-SHA-256"),
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Failed to connect to MongoDB")
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return client, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file12" style="display: none">package persistence
+
+import (
+        "database/sql"
+        "fmt"
+        "time"
+
+        "my-project/infrastructure/configuration"
+)
+
+func NewNativeDb() (*sql.DB, error) <span class="cov8" title="1">{
+        cfg := configuration.C.Database.MySql
+
+        dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&amp;parseTime=True&amp;loc=Local",
+                cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.Name)
+
+        db, err := sql.Open("mysql", dsn)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">db.SetConnMaxIdleTime(20)
+        db.SetMaxIdleConns(10)
+        db.SetConnMaxLifetime(time.Minute * 5)
+
+        return db, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file13" style="display: none">package persistence
+
+import (
+        "database/sql"
+        "fmt"
+        "strconv"
+        "time"
+
+        _ "github.com/lib/pq"
+        "my-project/infrastructure/configuration"
+        "my-project/infrastructure/logger"
+)
+
+func NewPostgreSQLDB() (*sql.DB, error) <span class="cov0" title="0">{
+        cfg := configuration.C.Database.Psql
+
+        port, err := strconv.Atoi(cfg.Port)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().
+                        WithField("error", err).
+                        WithField("port", cfg.Port).
+                        Error("Error while converting postgres port to int")
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">dsn := fmt.Sprintf(
+                "postgres://%s:%s@%s:%d/%s?sslmode=disable&amp;search_path=public",
+                cfg.User,
+                cfg.Password,
+                cfg.Host,
+                port,
+                cfg.Name,
+        )
+
+        db, err := sql.Open("postgres", dsn)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while connection to postgres")
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">db.SetConnMaxIdleTime(20)
+        db.SetMaxIdleConns(10)
+        db.SetConnMaxLifetime(time.Minute * 5)
+
+        _, err = db.Exec("SET SEARCH_PATH TO public")
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Println(err)
+        }</span>
+
+        <span class="cov0" title="0">return db, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file14" style="display: none">package persistence
+
+import (
+        "context"
+        "database/sql"
+        "time"
+
+        "go.mongodb.org/mongo-driver/v2/bson"
+        "go.mongodb.org/mongo-driver/v2/mongo"
+        "my-project/domain/model"
+        "my-project/infrastructure/logger"
+        "my-project/infrastructure/worker"
+)
+
+type ITestRepository interface {
+        Test(ctx context.Context) ([]model.Project, error)
+}
+
+type TestRepository struct {
+        mongoDb    *mongo.Client
+        PostgresDB *sql.DB
+}
+
+func (t *TestRepository) Test(ctx context.Context) ([]model.Project, error) <span class="cov0" title="0">{
+        myProjects := []model.Project{
+                {
+                        Name:        "Project 1",
+                        Description: "Description 1",
+                        CreatedAt:   time.Now(),
+                        UpdatedAt:   time.Now(),
+                },
+        }
+        worker.PooledWorkError(myProjects, t.PostgresDB)
+        collection := t.mongoDb.Database("my_project").Collection("projects")
+        cursor, err := collection.Find(ctx, bson.D{})
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while fetching data")
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">defer func(cursor *mongo.Cursor, ctx context.Context) </span><span class="cov0" title="0">{
+                err := cursor.Close(ctx)
+                if err != nil </span><span class="cov0" title="0">{
+                        logger.GetLogger().WithField("error", err).Error("Error while closing cursor")
+                }</span>
+        }(cursor, ctx)
+
+        <span class="cov0" title="0">var projects []model.Project
+        for cursor.Next(ctx) </span><span class="cov0" title="0">{
+                var project model.Project
+                err := cursor.Decode(&amp;project)
+                if err != nil </span><span class="cov0" title="0">{
+                        logger.GetLogger().WithField("error", err).Error("Error while decoding")
+                }</span>
+                <span class="cov0" title="0">projects = append(projects, project)</span>
+        }
+        <span class="cov0" title="0">return projects, nil</span>
+}
+
+func NewTestRepository(db *mongo.Client, postgresDB *sql.DB) ITestRepository <span class="cov0" title="0">{
+        return &amp;TestRepository{mongoDb: db, PostgresDB: postgresDB}
+}</span>
+</pre>
+		
+		<pre class="file" id="file15" style="display: none">package persistence
+
+import (
+        "context"
+        "database/sql"
+
+        "my-project/domain/model"
+        "my-project/domain/repository"
+        "my-project/infrastructure/logger"
+)
+
+const (
+        ErrorPreparingStatement = "Error while prepare statement"
+        ErrorClosingStatement   = "Error while close statement"
+)
+
+type UserRepository struct {
+        sqlDB *sql.DB
+}
+
+func NewUserRepository(sqlDB *sql.DB) repository.IUser <span class="cov8" title="1">{
+        return &amp;UserRepository{sqlDB}
+}</span>
+
+func (userRepository *UserRepository) GetById(ctx context.Context, id int) (model.User, error) <span class="cov8" title="1">{
+        var user model.User
+
+        statement, err := userRepository.sqlDB.PrepareContext(
+                ctx,
+                `SELECT u.id, u.name, u.user_name, u.password, u.created_at, u.updated_at 
+        FROM public.user AS u 
+        WHERE u.id = $1`,
+        )
+        if err != nil </span><span class="cov8" title="1">{
+                logger.GetLogger().WithField("error", err).Error(ErrorPreparingStatement)
+                return user, err
+        }</span>
+        <span class="cov8" title="1">defer func(statement *sql.Stmt) </span><span class="cov8" title="1">{
+                err := statement.Close()
+                if err != nil </span><span class="cov0" title="0">{
+                        logger.GetLogger().WithField("error", err).Error(ErrorClosingStatement)
+                }</span>
+        }(statement)
+
+        <span class="cov8" title="1">result := statement.QueryRow(id)
+        err = result.Scan(
+                &amp;user.ID,
+                &amp;user.Name,
+                &amp;user.UserName,
+                &amp;user.Password,
+                &amp;user.CreatedAt,
+                &amp;user.UpdatedAt,
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while query")
+                return user, err
+        }</span>
+
+        <span class="cov8" title="1">return user, nil</span>
+}
+
+func (userRepository *UserRepository) GetByUserName(
+        ctx context.Context,
+        userName string,
+) (model.User, error) <span class="cov8" title="1">{
+        var user model.User
+
+        statement, err := userRepository.sqlDB.PrepareContext(
+                ctx,
+                `SELECT u.id, u.name, u.user_name, u.password, u.created_at, u.updated_at 
+        FROM public.user AS u 
+        WHERE u.user_name = $1`,
+        )
+        if err != nil </span><span class="cov8" title="1">{
+                logger.GetLogger().WithField("error", err).Error(ErrorPreparingStatement)
+                return user, err
+        }</span>
+        <span class="cov0" title="0">defer func(statement *sql.Stmt) </span><span class="cov0" title="0">{
+                err := statement.Close()
+                if err != nil </span><span class="cov0" title="0">{
+                        logger.GetLogger().WithField("error", err).Error(ErrorClosingStatement)
+                }</span>
+        }(statement)
+
+        <span class="cov0" title="0">result := statement.QueryRow(userName)
+        err = result.Scan(
+                &amp;user.ID,
+                &amp;user.Name,
+                &amp;user.UserName,
+                &amp;user.Password,
+                &amp;user.CreatedAt,
+                &amp;user.UpdatedAt,
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while query")
+                return user, err
+        }</span>
+
+        <span class="cov0" title="0">return user, nil</span>
+}
+
+func (userRepository *UserRepository) CreateUser(ctx context.Context, user model.User) error <span class="cov8" title="1">{
+        statement, err := userRepository.sqlDB.PrepareContext(
+                ctx,
+                `INSERT INTO public.user (name, user_name, password) VALUES ($1, $2, $3)`,
+        )
+        if err != nil </span><span class="cov8" title="1">{
+                logger.GetLogger().WithField("error", err).Error(ErrorPreparingStatement)
+                return err
+        }</span>
+        <span class="cov8" title="1">defer func(statement *sql.Stmt) </span><span class="cov8" title="1">{
+                err := statement.Close()
+                if err != nil </span><span class="cov0" title="0">{
+                        logger.GetLogger().WithField("error", err).Error(ErrorClosingStatement)
+                }</span>
+        }(statement)
+
+        <span class="cov8" title="1">_, err = statement.Exec(user.Name, user.UserName, user.Password)
+        if err != nil </span><span class="cov8" title="1">{
+                logger.GetLogger().WithField("error", err).Error("Error execute query")
+                return err
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file16" style="display: none">package pubsub
+
+import (
+        "context"
+        "log"
+
+        "cloud.google.com/go/pubsub"
+)
+
+var topic *pubsub.Topic
+
+// Messages received by this instance.
+// messagesMu sync.Mutex
+// messages   []string
+// token is used to verify push requests.
+
+type PubSubHandler struct {
+        Topic        string
+        Subscription string
+        Handler      Handler
+}
+
+type Handler func(ctx context.Context, msg *pubsub.Message)
+
+func NewPubSub(ctx context.Context, projectID string) (*pubsub.Client, error) <span class="cov0" title="0">{
+        client, err := pubsub.NewClient(ctx, projectID)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">log.Printf("PubSub connected...")
+        return client, err</span>
+}
+</pre>
+		
+		<pre class="file" id="file17" style="display: none">package pubsub
+
+import (
+        "context"
+        "log"
+
+        "cloud.google.com/go/pubsub"
+        "my-project/infrastructure/logger"
+)
+
+type ITestPubSub interface {
+        Publish(ctx context.Context, topic string, payload []byte) (string, error)
+        GetSubscription(subID string) (*pubsub.Subscription, error)
+}
+
+type TestPubSub struct {
+        PubSubClient *pubsub.Client
+}
+
+func NewTestPubSub(pubSubClient *pubsub.Client) ITestPubSub <span class="cov8" title="1">{
+        return &amp;TestPubSub{
+                PubSubClient: pubSubClient,
+        }
+}</span>
+
+func (testPubSub *TestPubSub) Publish(
+        ctx context.Context,
+        topicName string,
+        payload []byte,
+) (string, error) <span class="cov0" title="0">{
+        msg := &amp;pubsub.Message{
+                Data: payload,
+        }
+
+        topic = testPubSub.PubSubClient.Topic(topicName)
+
+        // Create the topic if it doesn't exist.
+        exists, err := topic.Exists(ctx)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", err
+        }</span>
+        <span class="cov0" title="0">if !exists </span><span class="cov0" title="0">{
+                log.Printf("Topic %v doesn't exist - creating it", topicName)
+                _, err = testPubSub.PubSubClient.CreateTopic(ctx, topicName)
+                if err != nil </span><span class="cov0" title="0">{
+                        return "", err
+                }</span>
+        }
+
+        <span class="cov0" title="0">serverId, err := topic.Publish(ctx, msg).Get(ctx)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", err
+        }</span>
+
+        <span class="cov0" title="0">logger.GetLogger().WithField("server ID", serverId).Info("Message published")
+        return serverId, nil</span>
+}
+
+func (testPubSub *TestPubSub) GetSubscription(
+        subID string,
+) (*pubsub.Subscription, error) <span class="cov0" title="0">{
+        logger.GetLogger().WithField("subID", subID).Info("PubSub starting...")
+
+        return testPubSub.PubSubClient.Subscription(subID), nil
+}</span>
+</pre>
+		
+		<pre class="file" id="file18" style="display: none">package servicebus
+
+import (
+        "context"
+
+        "github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+        "github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
+)
+
+func NewServiceBus(ctx context.Context, namespace string) (*azservicebus.Client, error) <span class="cov8" title="1">{
+        cred, err := azidentity.NewDefaultAzureCredential(nil)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">client, err := azservicebus.NewClient(namespace, cred, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return client, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file19" style="display: none">package servicebus
+
+import (
+        "context"
+        "fmt"
+
+        "github.com/Azure/azure-sdk-for-go/sdk/messaging/azservicebus"
+        "my-project/infrastructure/logger"
+)
+
+type ITestServiceBus interface {
+        SendMessage(message []byte) error
+        GetMessage(count int)
+}
+
+type TestServicebus struct {
+        AzservicebusClient *azservicebus.Client
+}
+
+func NewTestServiceBus(azServiceBusClient *azservicebus.Client) ITestServiceBus <span class="cov8" title="1">{
+        return &amp;TestServicebus{AzservicebusClient: azServiceBusClient}
+}</span>
+
+func (testServiceBus *TestServicebus) SendMessage(message []byte) error <span class="cov0" title="0">{
+        sender, err := testServiceBus.AzservicebusClient.NewSender("test-queue", nil)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().
+                        WithField("error", err).
+                        Error("Error while making new sender service bus.")
+                return err
+        }</span>
+        <span class="cov0" title="0">defer func(sender *azservicebus.Sender, ctx context.Context) </span><span class="cov0" title="0">{
+                err := sender.Close(ctx)
+                if err != nil </span><span class="cov0" title="0">{
+                        logger.GetLogger().
+                                WithField("error", err).
+                                Error("Error while closing sender.")
+                }</span>
+        }(sender, context.Background())
+
+        <span class="cov0" title="0">sbMessage := &amp;azservicebus.Message{
+                Body: message,
+        }
+        err = sender.SendMessage(context.Background(), sbMessage, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while sending message.")
+                return err
+        }</span>
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func (testServiceBus *TestServicebus) GetMessage(count int) <span class="cov0" title="0">{
+        receiver, err := testServiceBus.AzservicebusClient.NewReceiverForQueue("testqueue", nil)
+        if err != nil </span><span class="cov0" title="0">{
+                panic(err)</span>
+        }
+        <span class="cov0" title="0">defer func(receiver *azservicebus.Receiver, ctx context.Context) </span><span class="cov0" title="0">{
+                err := receiver.Close(ctx)
+                if err != nil </span><span class="cov0" title="0">{
+                        logger.GetLogger().
+                                WithField("error", err).
+                                Error("Error while closing receiver.")
+                }</span>
+        }(receiver, context.Background())
+
+        <span class="cov0" title="0">messages, err := receiver.ReceiveMessages(context.Background(), count, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                panic(err)</span>
+        }
+
+        <span class="cov0" title="0">for _, message := range messages </span><span class="cov0" title="0">{
+                body := message.Body
+                fmt.Printf("%s\n", string(body))
+
+                err = receiver.CompleteMessage(context.Background(), message, nil)
+                if err != nil </span><span class="cov0" title="0">{
+                        panic(err)</span>
+                }
+        }
+}
+</pre>
+		
+		<pre class="file" id="file20" style="display: none">package utils
+
+import (
+        "time"
+
+        "github.com/golang-jwt/jwt"
+        "my-project/infrastructure/logger"
+)
+
+func GetCurrentTime() time.Time <span class="cov8" title="1">{
+        return time.Now().UTC()
+}</span>
+
+func GenerateToken(payload map[string]interface{}, secretKey string) (string, error) <span class="cov0" title="0">{
+        var claims jwt.MapClaims = payload
+        token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+        tokenString, err := token.SignedString([]byte(secretKey))
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while generate token")
+                return "", err
+        }</span>
+        <span class="cov0" title="0">return tokenString, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file21" style="display: none">package worker
+
+import (
+        "database/sql"
+        "fmt"
+        "log"
+        "sync"
+        "time"
+
+        "my-project/domain/model"
+        "my-project/infrastructure/logger"
+)
+
+func PooledWorkError(allData []model.Project, db *sql.DB) <span class="cov0" title="0">{
+        start := time.Now()
+        var wg sync.WaitGroup
+        workerPoolSize := 100
+
+        dataCh := make(chan model.Project, workerPoolSize)
+        errors := make(chan error, 100)
+
+        for i := 0; i &lt; workerPoolSize; i++ </span><span class="cov0" title="0">{
+                wg.Add(1)
+                go func() </span><span class="cov0" title="0">{
+                        defer wg.Done()
+
+                        for data := range dataCh </span><span class="cov0" title="0">{
+                                process(data, db, errors)
+                        }</span>
+                }()
+        }
+
+        <span class="cov0" title="0">for i := range allData </span><span class="cov0" title="0">{
+                dataCh &lt;- allData[i]
+        }</span>
+
+        <span class="cov0" title="0">close(dataCh)
+
+        wg.Add(1)
+        go func() </span><span class="cov0" title="0">{
+                defer wg.Done()
+                for </span><span class="cov0" title="0">{
+                        select </span>{
+                        case err := &lt;-errors:<span class="cov0" title="0">
+                                fmt.Println("finished with error:", err.Error())</span>
+                        case &lt;-time.After(time.Second * 1):<span class="cov0" title="0">
+                                fmt.Println("Timeout: errors finished")
+                                return</span>
+                        }
+                }
+        }()
+
+        <span class="cov0" title="0">defer close(errors)
+        wg.Wait()
+        elapsed := time.Since(start)
+        fmt.Printf("Took ===============&gt; %s\n", elapsed)</span>
+}
+
+func process(data model.Project, db *sql.DB, errors chan&lt;- error) <span class="cov0" title="0">{
+        fmt.Printf("Start processing %s\n", data.Name)
+        time.Sleep(100 * time.Millisecond)
+
+        if data.Name == "" </span><span class="cov0" title="0">{
+                errors &lt;- fmt.Errorf("error on job %v", data.Name)
+        }</span> else<span class="cov0" title="0"> {
+                result, err := db.Exec("INSERT INTO project (name, description) VALUES($1, $2)", data.Name, data.Description)
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Printf("An error occurred %v", err)
+                }</span>
+                <span class="cov0" title="0">defer func(db *sql.DB) </span><span class="cov0" title="0">{
+                        err := db.Close()
+                        if err != nil </span><span class="cov0" title="0">{
+                                logger.GetLogger().Error(err)
+                        }</span>
+                }(db)
+                <span class="cov0" title="0">id, err := result.LastInsertId()
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Printf("Fail to get last inserted id")
+                }</span>
+
+                <span class="cov0" title="0">fmt.Printf("Finish processing %s With %d\n", data.Name, id)</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file22" style="display: none">package http
+
+import (
+        "net/http"
+
+        "github.com/gin-gonic/gin"
+        "my-project/usecase"
+)
+
+type ITestHandler interface {
+        Test(c *gin.Context)
+}
+
+type TestHandler struct {
+        TestUsecase usecase.ITestUsecase
+}
+
+func NewTestHandler(testUsecase usecase.ITestUsecase) ITestHandler <span class="cov0" title="0">{
+        return &amp;TestHandler{TestUsecase: testUsecase}
+}</span>
+
+func (testHandler *TestHandler) Test(c *gin.Context) <span class="cov0" title="0">{
+        res := testHandler.TestUsecase.Test(c.Request.Context())
+        c.JSON(http.StatusOK, res)
+}</span>
+</pre>
+		
+		<pre class="file" id="file23" style="display: none">package http
+
+import (
+        "crypto/md5"
+        "fmt"
+        "log"
+        "net/http"
+
+        "github.com/gin-gonic/gin"
+        "my-project/domain/model"
+        "my-project/infrastructure/logger"
+        "my-project/usecase"
+)
+
+const (
+        ErrorUnmarshal = "Error while unmarshal"
+)
+
+type IUserHandler interface {
+        Login(c *gin.Context)
+        Register(c *gin.Context)
+}
+
+type UserHandler struct {
+        userUsecase usecase.IUserUsecase
+}
+
+func NewUserHandler(userUsecase usecase.IUserUsecase) IUserHandler <span class="cov0" title="0">{
+        return &amp;UserHandler{userUsecase: userUsecase}
+}</span>
+
+func (userHandler *UserHandler) Login(c *gin.Context) <span class="cov0" title="0">{
+        var req model.ReqLogin
+
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error(ErrorUnmarshal)
+                c.JSON(http.StatusBadRequest, fmt.Sprintf("%s %v", ErrorUnmarshal, err.Error()))
+                return
+        }</span>
+
+        <span class="cov0" title="0">res := userHandler.userUsecase.Login(c.Request.Context(), req)
+
+        c.JSON(http.StatusOK, res)</span>
+}
+
+func (userHandler *UserHandler) Register(c *gin.Context) <span class="cov0" title="0">{
+        var req model.ReqRegister
+
+        if err := c.ShouldBindJSON(&amp;req); err != nil </span><span class="cov0" title="0">{
+                log.Printf("An error occurred: %v", err)
+                c.JSON(http.StatusBadRequest, fmt.Sprintf("An error occurred: %v", err.Error()))
+                return
+        }</span>
+        <span class="cov0" title="0">data := []byte(req.Password)
+        req.Password = fmt.Sprintf("%x", md5.Sum(data))
+        res := userHandler.userUsecase.Register(c.Request.Context(), req)
+
+        c.JSON(http.StatusOK, res)</span>
+}
+</pre>
+		
+		<pre class="file" id="file24" style="display: none">package middleware
+
+import (
+        "errors"
+        "fmt"
+        "log"
+        "net/http"
+        "os"
+        "strings"
+
+        "github.com/gin-gonic/gin"
+        "github.com/golang-jwt/jwt"
+        "my-project/domain/dto"
+        "my-project/domain/model"
+        "my-project/domain/repository"
+)
+
+func Auth(userRepository repository.IUser) gin.HandlerFunc <span class="cov0" title="0">{
+        var res dto.Res
+        res.ResponseCode = "401"
+        res.ResponseMessage = "Unauthorized"
+
+        log.Println("Inside auth middleware")
+        return func(ctx *gin.Context) </span><span class="cov0" title="0">{
+                authorization := ctx.Request.Header.Get("Authorization")
+                secretKey := os.Getenv("SECRET_KEY")
+                if authorization == "" </span><span class="cov0" title="0">{
+                        ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+                        return
+                }</span>
+                <span class="cov0" title="0">auth := strings.Split(authorization, "Bearer ")
+                fmt.Println("Auth:", auth[1])
+                if len(auth) != 2 </span><span class="cov0" title="0">{
+                        ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+                        return
+                }</span>
+                <span class="cov0" title="0">userClaims, token, err := getClaim(auth, secretKey)
+
+                if token.Valid </span><span class="cov0" title="0">{
+                        if !next(ctx, userRepository, userClaims) </span><span class="cov0" title="0">{
+                                ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+                                return
+                        }</span>
+                } else<span class="cov0" title="0"> {
+                        if abort(err, res) </span><span class="cov0" title="0">{
+                                ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
+                                return
+                        }</span>
+                }
+        }
+}
+
+func abort(err error, res dto.Res) bool <span class="cov0" title="0">{
+        var ve *jwt.ValidationError
+        if errors.As(err, &amp;ve) </span><span class="cov0" title="0">{
+                if ve.Errors&amp;jwt.ValidationErrorMalformed != 0 </span><span class="cov0" title="0">{
+                        res.ResponseMessage = "That's not even a token"
+                }</span> else<span class="cov0" title="0"> if ve.Errors&amp;(jwt.ValidationErrorExpired|jwt.ValidationErrorNotValidYet) != 0 </span><span class="cov0" title="0">{
+                        // Token is either expired or not active yet
+                        res.ResponseMessage = "Timing is everything"
+                }</span> else<span class="cov0" title="0"> {
+                        res.ResponseMessage = fmt.Sprintf("Couldn't handle this token:%v", err)
+                }</span>
+                <span class="cov0" title="0">return true</span>
+        }
+        <span class="cov0" title="0">return false</span>
+}
+
+func next(ctx *gin.Context, userRepository repository.IUser, userClaims model.UserClaims) bool <span class="cov0" title="0">{
+        fmt.Println("You look nice today")
+        _, err := userRepository.GetByUserName(ctx.Request.Context(), userClaims.UserName)
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Println("User not found")
+                return true
+        }</span>
+        <span class="cov0" title="0">ctx.Set("user_id", userClaims.Issuer)
+        ctx.Next()
+        return false</span>
+}
+
+func getClaim(auth []string, secretKey string) (model.UserClaims, *jwt.Token, error) <span class="cov0" title="0">{
+        var userClaims model.UserClaims
+        token, err := jwt.ParseWithClaims(
+                auth[1],
+                &amp;userClaims,
+                func(token *jwt.Token) (interface{}, error) </span><span class="cov0" title="0">{
+                        return []byte(secretKey), nil
+                }</span>,
+        )
+        <span class="cov0" title="0">fmt.Printf("Claims: %+v\n", userClaims)
+        return userClaims, token, err</span>
+}
+</pre>
+		
+		<pre class="file" id="file25" style="display: none">package main
+
+import (
+        "context"
+        "database/sql"
+        "errors"
+        "fmt"
+        "log"
+        "net/http"
+        "os"
+        "os/signal"
+        "syscall"
+        "time"
+
+        "golang.org/x/sync/errgroup"
+        "my-project/infrastructure/cache"
+        tulushost "my-project/infrastructure/clients/tulustech"
+        "my-project/infrastructure/configuration"
+        "my-project/infrastructure/filecsv"
+        "my-project/infrastructure/googlesheet"
+        "my-project/infrastructure/logger"
+        "my-project/infrastructure/persistence"
+        "my-project/infrastructure/pubsub"
+        "my-project/infrastructure/servicebus"
+        httpHandler "my-project/interfaces/http"
+        "my-project/server"
+        "my-project/usecase"
+)
+
+var httpServer *http.Server
+
+func recoverPanic() <span class="cov0" title="0">{
+        if err := recover(); err != nil </span><span class="cov0" title="0">{
+                fmt.Printf("RECOVERED: %v\n", err)
+        }</span>
+}
+
+func main() <span class="cov0" title="0">{
+        InitiateGoroutine()
+        defer recoverPanic()
+        ctx := context.Background()
+        ctx, cancel := context.WithCancel(ctx)
+        defer cancel()
+
+        interrupt := make(chan os.Signal, 1)
+        signal.Notify(interrupt, os.Interrupt, syscall.SIGTERM)
+        defer signal.Stop(interrupt)
+
+        g, ctx := errgroup.WithContext(ctx)
+
+        // configuration.LoadConfig()
+
+        app := configuration.C.App
+
+        mysqlDb, psqlDb, err := InitiateDatabase()
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Println(err)
+        }</span>
+
+        <span class="cov0" title="0">mongoDb, err := persistence.NewMongoDb(
+                configuration.C.Database.Mongo.Host,
+                configuration.C.Database.Mongo.Port,
+                configuration.C.Database.Mongo.User,
+                configuration.C.Database.Mongo.Password,
+                configuration.C.Database.Mongo.Name,
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while instantiate MongoDB")
+                panic(err)</span>
+        }
+        <span class="cov0" title="0">err = mongoDb.Ping(ctx, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while Ping MongoDB")
+                panic(err)</span>
+        }
+        <span class="cov0" title="0">fmt.Println("MongoDB connected")
+
+        logger.GetLogger().
+                WithField("MySQLDb", mysqlDb.Ping()).
+                WithField("PSQLDb", psqlDb.Ping()).
+                Info("Database connected.")
+
+        pubSubClient, err := pubsub.NewPubSub(ctx, configuration.C.Pubsub.ProjectID)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while instantiate PubSub")
+                // panic(err)
+        }</span>
+
+        <span class="cov0" title="0">azServiceBusClient, err := servicebus.NewServiceBus(ctx, configuration.C.ServiceBus.Namespace)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while instantiate ServiceBus")
+                panic(err)</span>
+        }
+        <span class="cov0" title="0">redisClient, _ := cache.NewCache(
+                ctx,
+                fmt.Sprintf("%s:%s", configuration.C.RedisClient.Host, configuration.C.RedisClient.Port),
+                configuration.C.RedisClient.Username,
+                configuration.C.RedisClient.Password,
+        )
+
+        testRepository := persistence.NewTestRepository(mongoDb, psqlDb)
+        project, err := testRepository.Test(ctx)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while fetching data")
+        }</span>
+        <span class="cov0" title="0">fmt.Printf("Project %v\n", project)
+        testCache := cache.NewTestCache(redisClient)
+
+        logger.GetLogger().Info("Redis client initialized successfully.")
+
+        tulusTechHost := tulushost.NewTulusHost(configuration.C.TulusTech.Host)
+
+        testPubSub := pubsub.NewTestPubSub(pubSubClient)
+        testServiceBus := servicebus.NewTestServiceBus(azServiceBusClient)
+
+        userRepository := persistence.NewUserRepository(psqlDb)
+        userUsecase := usecase.NewUserUsecase(userRepository)
+        testUsecase := usecase.NewTestUsecase(tulusTechHost, testPubSub, testServiceBus, testCache)
+        // testRes := testUsecase.Test(ctx)
+        // fmt.Println("Test response", testRes)
+
+        userHandler := httpHandler.NewUserHandler(userUsecase)
+        testHandler := httpHandler.NewTestHandler(testUsecase)
+
+        router := server.InitiateRouter(userHandler, testHandler, userRepository)
+
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while StartSubscription")
+        }</span>
+
+        <span class="cov0" title="0">Test()
+
+        signalChan := make(chan os.Signal, 1)
+        signal.Notify(signalChan, os.Interrupt)
+        defer func() </span><span class="cov0" title="0">{
+                signal.Stop(signalChan)
+                cancel()
+        }</span>()
+
+        <span class="cov0" title="0">port := app.Port
+        logger.GetLogger().WithField("port", port).Info("Starting application")
+        g.Go(func() error </span><span class="cov0" title="0">{
+                httpServer := &amp;http.Server{
+                        Addr:         fmt.Sprintf(":%d", port),
+                        Handler:      router,
+                        ReadTimeout:  0,
+                        WriteTimeout: 0,
+                }
+                if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov0" title="0">logger.GetLogger().WithField("port", port).Error("Application start")
+                return nil</span>
+        })
+
+        <span class="cov0" title="0">select </span>{
+        case &lt;-interrupt:<span class="cov0" title="0">
+                fmt.Println("Exit")
+                os.Exit(1)</span>
+        case &lt;-ctx.Done():<span class="cov0" title="0">
+                break</span>
+        }
+
+        <span class="cov0" title="0">cancel()
+        shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer shutdownCancel()
+
+        if httpServer != nil </span><span class="cov0" title="0">{
+                _ = httpServer.Shutdown(shutdownCtx)
+        }</span>
+
+        <span class="cov0" title="0">err = g.Wait()
+        if err != nil </span><span class="cov0" title="0">{
+                log.Printf("server returning an error %v", err)
+                os.Exit(2)
+        }</span>
+}
+
+func InitiateDatabase() (*sql.DB, *sql.DB, error) <span class="cov0" title="0">{
+        var err error
+
+        db, err := persistence.NewNativeDb()
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Cannot connect to the local database")
+                return nil, nil, err
+        }</span>
+
+        <span class="cov0" title="0">postgres, err := persistence.NewPostgreSQLDB()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, nil, err
+        }</span>
+
+        <span class="cov0" title="0">return db, postgres, err</span>
+}
+
+func InitiateGoroutine() <span class="cov0" title="0">{
+        fmt.Println("Hello World!")
+
+        for i := 0; i &lt; 10; i++ </span><span class="cov0" title="0">{
+                go fmt.Println(i)
+        }</span>
+}
+
+func Test() <span class="cov0" title="0">{
+        file, err := filecsv.NewFile("cover.txt")
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while loading file")
+        }</span>
+
+        <span class="cov0" title="0">validateCsv := filecsv.NewValidateCsv(file)
+        logger.GetLogger().WithField("validateCsv", validateCsv).Info("Validate CSV initialized")
+
+        googleSheet, err := googlesheet.NewGoogleSheet()
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Error("Error while loading Google Sheet")
+        }</span>
+
+        <span class="cov0" title="0">logger.GetLogger().WithField("googleSheet", googleSheet).Info("Google sheet initialized")</span>
+}
+</pre>
+		
+		<pre class="file" id="file26" style="display: none">// Code generated by mockery v2.33.0. DO NOT EDIT.
+
+package repomocks
+
+import (
+        context "context"
+        model "my-project/domain/model"
+
+        mock "github.com/stretchr/testify/mock"
+)
+
+// IUser is an autogenerated mock type for the IUser type
+type IUser struct {
+        mock.Mock
+}
+
+// CreateUser provides a mock function with given fields: ctx, user
+func (_m *IUser) CreateUser(ctx context.Context, user model.User) error <span class="cov0" title="0">{
+        ret := _m.Called(ctx, user)
+
+        var r0 error
+        if rf, ok := ret.Get(0).(func(context.Context, model.User) error); ok </span><span class="cov0" title="0">{
+                r0 = rf(ctx, user)
+        }</span> else<span class="cov0" title="0"> {
+                r0 = ret.Error(0)
+        }</span>
+
+        <span class="cov0" title="0">return r0</span>
+}
+
+// GetById provides a mock function with given fields: ctx, id
+func (_m *IUser) GetById(ctx context.Context, id int) (model.User, error) <span class="cov0" title="0">{
+        ret := _m.Called(ctx, id)
+
+        var r0 model.User
+        var r1 error
+        if rf, ok := ret.Get(0).(func(context.Context, int) (model.User, error)); ok </span><span class="cov0" title="0">{
+                return rf(ctx, id)
+        }</span>
+        <span class="cov0" title="0">if rf, ok := ret.Get(0).(func(context.Context, int) model.User); ok </span><span class="cov0" title="0">{
+                r0 = rf(ctx, id)
+        }</span> else<span class="cov0" title="0"> {
+                r0 = ret.Get(0).(model.User)
+        }</span>
+
+        <span class="cov0" title="0">if rf, ok := ret.Get(1).(func(context.Context, int) error); ok </span><span class="cov0" title="0">{
+                r1 = rf(ctx, id)
+        }</span> else<span class="cov0" title="0"> {
+                r1 = ret.Error(1)
+        }</span>
+
+        <span class="cov0" title="0">return r0, r1</span>
+}
+
+// GetByUserName provides a mock function with given fields: ctx, userName
+func (_m *IUser) GetByUserName(ctx context.Context, userName string) (model.User, error) <span class="cov0" title="0">{
+        ret := _m.Called(ctx, userName)
+
+        var r0 model.User
+        var r1 error
+        if rf, ok := ret.Get(0).(func(context.Context, string) (model.User, error)); ok </span><span class="cov0" title="0">{
+                return rf(ctx, userName)
+        }</span>
+        <span class="cov0" title="0">if rf, ok := ret.Get(0).(func(context.Context, string) model.User); ok </span><span class="cov0" title="0">{
+                r0 = rf(ctx, userName)
+        }</span> else<span class="cov0" title="0"> {
+                r0 = ret.Get(0).(model.User)
+        }</span>
+
+        <span class="cov0" title="0">if rf, ok := ret.Get(1).(func(context.Context, string) error); ok </span><span class="cov0" title="0">{
+                r1 = rf(ctx, userName)
+        }</span> else<span class="cov0" title="0"> {
+                r1 = ret.Error(1)
+        }</span>
+
+        <span class="cov0" title="0">return r0, r1</span>
+}
+
+// NewIUser creates a new instance of IUser. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
+// The first argument is typically a *testing.T value.
+func NewIUser(t interface {
+        mock.TestingT
+        Cleanup(func())
+}) *IUser <span class="cov0" title="0">{
+        mock := &amp;IUser{}
+        mock.Mock.Test(t)
+
+        t.Cleanup(func() </span><span class="cov0" title="0">{ mock.AssertExpectations(t) }</span>)
+
+        <span class="cov0" title="0">return mock</span>
+}
+</pre>
+		
+		<pre class="file" id="file27" style="display: none">package server
+
+import (
+        "net/http"
+        "time"
+
+        "github.com/gin-contrib/cors"
+        "github.com/gin-gonic/gin"
+        "my-project/domain/repository"
+        httpHandler "my-project/interfaces/http"
+        "my-project/interfaces/middleware"
+)
+
+func InitiateRouter(
+        userHandler httpHandler.IUserHandler,
+        testHandler httpHandler.ITestHandler,
+        userRepository repository.IUser,
+) *gin.Engine <span class="cov0" title="0">{
+        router := gin.New()
+        router.Use(gin.Recovery())
+        router.Use(cors.New(cors.Config{
+                AllowOrigins:     []string{"https://tulus.tech"},
+                AllowMethods:     []string{"PUT", "PATCH"},
+                AllowHeaders:     []string{"Origin"},
+                ExposeHeaders:    []string{"Content-Length"},
+                AllowCredentials: true,
+                AllowOriginFunc: func(origin string) bool </span><span class="cov0" title="0">{
+                        return origin == "https://tulus.tech"
+                }</span>,
+                MaxAge: 12 * time.Hour,
+        }))
+
+        <span class="cov0" title="0">api := router.Group("api")
+        api.Use(middleware.Auth(userRepository))
+
+        router.POST("/login", userHandler.Login)
+        router.POST("/register", userHandler.Register)
+
+        router.POST("/healthz", testHandler.Test)
+
+        api.POST("/", func(ctx *gin.Context) </span><span class="cov0" title="0">{
+                res := ctx.Request.Body
+                ctx.JSON(http.StatusOK, res)
+        }</span>)
+
+        <span class="cov0" title="0">return router</span>
+}
+</pre>
+		
+		<pre class="file" id="file28" style="display: none">package usecase
+
+import (
+        "context"
+        "encoding/json"
+
+        "my-project/domain/dto"
+        "my-project/infrastructure/cache"
+        tulushost "my-project/infrastructure/clients/tulustech"
+        "my-project/infrastructure/clients/tulustech/models"
+        "my-project/infrastructure/logger"
+        "my-project/infrastructure/pubsub"
+        "my-project/infrastructure/servicebus"
+)
+
+type ITestUsecase interface {
+        Test(ctx context.Context) dto.TestDto
+}
+
+type TestUsecase struct {
+        TulusTechHost  tulushost.ITulusHost
+        TestPubSub     pubsub.ITestPubSub
+        TestServiceBus servicebus.ITestServiceBus
+        TestCache      cache.ITestCache
+}
+
+// This interface is defined in infrastructure/clients/tulustech/host.go
+// Keeping this here would cause duplication and potential inconsistency
+// type ITulusHost interface {
+//         GetRandomTyping(reqHeader models.ReqHeader) (models.ResTypingRandom, error)
+// }
+
+func NewTestUsecase(
+        tulusTechHost tulushost.ITulusHost,
+        testPubSub pubsub.ITestPubSub,
+        testServiceBus servicebus.ITestServiceBus,
+        testCache cache.ITestCache,
+) ITestUsecase <span class="cov8" title="1">{
+        return &amp;TestUsecase{
+                TulusTechHost:  tulusTechHost,
+                TestPubSub:     testPubSub,
+                TestServiceBus: testServiceBus,
+                TestCache:      testCache,
+        }
+}</span>
+
+func (testUsecase *TestUsecase) Test(ctx context.Context) dto.TestDto <span class="cov8" title="1">{
+        var res dto.TestDto
+
+        res.PubSub = "Not OK"
+        res.ServiceBus = "Not OK"
+
+        msg := "Hello"
+        byteMsg, err := json.Marshal(msg)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().Error("Error while marshalling")
+                return res
+        }</span>
+        <span class="cov8" title="1">publishResponse, err := testUsecase.TestPubSub.Publish(ctx, "topic", byteMsg)
+        if err != nil </span><span class="cov8" title="1">{
+                logger.GetLogger().Error("Error while publishing message")
+                res.PubSub = err.Error()
+                return res
+        }</span>
+        <span class="cov8" title="1">logger.GetLogger().WithField("publishResponse", publishResponse).Info("Successfully published")
+        res.PubSub = "OK"
+
+        err = testUsecase.TestServiceBus.SendMessage(byteMsg)
+        if err != nil </span><span class="cov8" title="1">{
+                logger.GetLogger().Error("Error while publishing message with service bus")
+                res.ServiceBus = err.Error()
+                return res
+        }</span>
+        <span class="cov8" title="1">res.ServiceBus = "OK"
+
+        testUsecase.TestCache.Set(ctx, "test", "test")
+        val, err := testUsecase.TestCache.Get(ctx, "test")
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().Error("Error while getting value from cache")
+                res.Cache = "Error while getting value from cache"
+                return res
+        }</span>
+        <span class="cov8" title="1">res.Cache = val.(string)
+
+        reqHeader := models.ReqHeader{}
+        randomTypingRes, err := testUsecase.TulusTechHost.GetRandomTyping(reqHeader)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().Error("Error while get random typing")
+                res.TulusTech = err.Error()
+                return res
+        }</span>
+        <span class="cov8" title="1">logger.GetLogger().
+                WithField("randomTypingResponse", randomTypingRes).
+                Info("Successfully get random typing")
+        res.TulusTech = "OK"
+
+        return res</span>
+}
+</pre>
+		
+		<pre class="file" id="file29" style="display: none">package usecase
+
+import (
+        "context"
+        "crypto/md5"
+        "fmt"
+        "time"
+
+        "my-project/domain/dto"
+        "my-project/domain/model"
+        "my-project/domain/repository"
+        "my-project/infrastructure/configuration"
+        "my-project/infrastructure/logger"
+        "my-project/infrastructure/utils"
+)
+
+type IUserUsecase interface {
+        Login(ctx context.Context, req model.ReqLogin) dto.ResLogin
+        Register(ctx context.Context, req model.ReqRegister) dto.ResRegister
+}
+
+type UserUsecase struct {
+        userRepository repository.IUser
+}
+
+func NewUserUsecase(userRepository repository.IUser) IUserUsecase <span class="cov8" title="1">{
+        return &amp;UserUsecase{userRepository: userRepository}
+}</span>
+
+func (userUsecase *UserUsecase) Login(ctx context.Context, req model.ReqLogin) dto.ResLogin <span class="cov8" title="1">{
+        var res dto.ResLogin
+
+        user, err := userUsecase.userRepository.GetByUserName(ctx, req.UserName)
+        if err != nil </span><span class="cov8" title="1">{
+                logger.GetLogger().WithField("error", err).Error("Error while Getting username")
+                res.ResponseCode = "401"
+                res.ResponseMessage = "Unautorized."
+                return res
+        }</span>
+        <span class="cov8" title="1">md5Req := fmt.Sprintf("%x", md5.Sum([]byte(req.Password)))
+
+        if md5Req != user.Password </span><span class="cov8" title="1">{
+                logger.GetLogger().WithField("request_password", md5Req).Error("Password not matching")
+                res.ResponseCode = "401"
+                res.ResponseMessage = "Unautorized."
+                return res
+        }</span>
+
+        <span class="cov8" title="1">secretKey := configuration.C.App.SecretKey
+
+        // Create the Claims
+        expiration := time.Now().Add(5 * time.Minute)
+
+        claims := make(map[string]interface{})
+        claims["user_name"] = user.UserName
+        claims["exp"] = expiration.Unix()
+        claims["is"] = fmt.Sprint(user.ID)
+
+        accessToken, err := utils.GenerateToken(claims, secretKey)
+        if err != nil </span><span class="cov0" title="0">{
+                logger.GetLogger().WithField("error", err).Info("Error while Signed string")
+                res.ResponseCode = "401"
+                res.ResponseMessage = "Unautorized"
+                return res
+        }</span>
+        <span class="cov8" title="1">res.ResponseCode = "200"
+        res.ResponseMessage = "Success"
+        res.Data.AccessToken = accessToken
+        res.Data.ExpiresAt = expiration.Unix()
+
+        return res</span>
+}
+
+func (userUcase *UserUsecase) Register(ctx context.Context, req model.ReqRegister) dto.ResRegister <span class="cov8" title="1">{
+        var res dto.ResRegister
+
+        reqUser := model.User{
+                Name:     req.Name,
+                UserName: req.UserName,
+                Password: req.Password,
+        }
+        err := userUcase.userRepository.CreateUser(ctx, reqUser)
+        if err != nil </span><span class="cov8" title="1">{
+                res.Data = nil
+                res.ResponseCode = "500"
+                res.ResponseMessage = "Internal server error"
+                return res
+        }</span>
+        <span class="cov8" title="1">userDto := dto.UserDto{
+                Name:     req.Name,
+                UserName: req.UserName,
+        }
+        res.Data = userDto
+        res.ResponseCode = "200"
+        res.ResponseMessage = "Success"
+
+        return res</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
