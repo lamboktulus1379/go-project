@@ -22,9 +22,13 @@ go.work
 
 # Environment variables (sensitive data)
 .env
+.env.*
 .env.local
 .env.production
 .env.development
+.env.youtube
+config.env
+config-*.env
 *.env
 
 # Credentials and secrets
