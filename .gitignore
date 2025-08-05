@@ -20,6 +20,18 @@
 # Go workspace file
 go.work
 
+# Environment variables (sensitive data)
+.env
+.env.local
+.env.production
+.env.development
+*.env
+
+# Credentials and secrets
+credentials.json
+client_secret_*.json
+service-account-*.json
+
 # Log
 logs
 *.csv

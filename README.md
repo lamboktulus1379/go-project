@@ -4,20 +4,47 @@
 - [Description](#description)
 - [Requirements](#requirements)
 - [Setup](#setup)
+- [YouTube API Integration](#youtube-api-integration)
 - [Installation](#installation)
 - [Usage](#usage)
 - [License](#license)
 
 ## Description
-This project is a go starter project.
+This project is a go starter project with YouTube API integration for managing videos, channels, comments, and more.
 
 ## Requirements
-- Go 1.16
+- Go 1.21+
 - MySQL 5.7
+- MongoDB (optional)
 - Liquibase 4.3.5
 - Docker 20.10.7
 - Docker Compose 1.29.2
-- GoLand 2021.1.3
+- Google Cloud Console account (for YouTube API)
+
+## YouTube API Integration
+
+This project includes a complete YouTube API integration that allows you to:
+- 🔐 OAuth2 authentication with Google
+- 📹 Get your YouTube videos and channel information
+- 🔍 Search YouTube videos
+- 📤 Upload videos to YouTube
+- 💬 Manage comments (get, add, update, delete)
+- 👍 Like/dislike videos and comments
+- 📊 Access video analytics and statistics
+
+### Quick Setup
+1. Copy environment template: `cp .env.example .env`
+2. Configure your Google Cloud credentials in `.env`
+3. Follow the detailed setup guide: [YOUTUBE_API_SETUP.md](./YOUTUBE_API_SETUP.md)
+
+### API Endpoints
+- **Auth**: `/auth/youtube`, `/auth/youtube/callback`
+- **Videos**: `/api/youtube/videos/*`
+- **Search**: `/api/youtube/search`
+- **Channel**: `/api/youtube/channel`
+- **Comments**: `/api/youtube/comments/*`
+
+For complete setup instructions, see [YOUTUBE_API_SETUP.md](./YOUTUBE_API_SETUP.md).
 - Postman 8.10.0
 - Git 2.25.1
 - GitHub

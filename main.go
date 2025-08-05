@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"golang.org/x/sync/errgroup"
 	"my-project/infrastructure/cache"
 	tulushost "my-project/infrastructure/clients/tulustech"
+	youtubeclient "my-project/infrastructure/clients/youtube"
 	"my-project/infrastructure/configuration"
 	"my-project/infrastructure/filecsv"
 	"my-project/infrastructure/googlesheet"
@@ -25,6 +25,8 @@ import (
 	httpHandler "my-project/interfaces/http"
 	"my-project/server"
 	"my-project/usecase"
+
+	"golang.org/x/sync/errgroup"
 )
 
 var httpServer *http.Server
@@ -119,10 +121,53 @@ func main() {
 	// testRes := testUsecase.Test(ctx)
 	// fmt.Println("Test response", testRes)
 
+	// Initialize YouTube components
+	youtubeConfig, err := configuration.GetYouTubeConfig()
+	if err != nil {
+		logger.GetLogger().WithField("error", err).Warn("YouTube configuration not found - YouTube features will be disabled")
+		// Continue without YouTube functionality
+	}
+
+	var youtubeHandler httpHandler.IYouTubeHandler
+	var youtubeAuthHandler httpHandler.IYouTubeAuthHandler
+
+	// Always try to initialize YouTube auth handler (doesn't require tokens)
+	youtubeAuthHandler, err = httpHandler.NewYouTubeAuthHandler()
+	if err != nil {
+		logger.GetLogger().WithField("error", err).Warn("Failed to initialize YouTube auth handler")
+		youtubeAuthHandler = nil
+	}
+
+	// Only initialize YouTube client if we have access tokens
+	if youtubeConfig != nil && youtubeConfig.AccessToken != "" && youtubeConfig.AccessToken != "your_access_token_here" {
+		// Convert configuration to YouTube client config
+		youtubeClientConfig := &youtubeclient.Config{
+			ClientID:     youtubeConfig.ClientID,
+			ClientSecret: youtubeConfig.ClientSecret,
+			RedirectURL:  youtubeConfig.RedirectURL,
+			AccessToken:  youtubeConfig.AccessToken,
+			RefreshToken: youtubeConfig.RefreshToken,
+			ChannelID:    youtubeConfig.ChannelID,
+		}
+
+		// Initialize YouTube client
+		youtubeClient, err := youtubeclient.NewYouTubeClient(ctx, youtubeClientConfig)
+		if err != nil {
+			logger.GetLogger().WithField("error", err).Warn("Failed to initialize YouTube client - YouTube features will be disabled")
+		} else {
+			// Initialize YouTube use case and handler
+			youtubeUsecase := usecase.NewYouTubeUseCase(youtubeClient)
+			youtubeHandler = httpHandler.NewYouTubeHandler(youtubeUsecase)
+			logger.GetLogger().Info("YouTube API client initialized successfully")
+		}
+	} else {
+		logger.GetLogger().Info("YouTube access tokens not configured - only OAuth authentication will be available")
+	}
+
 	userHandler := httpHandler.NewUserHandler(userUsecase)
 	testHandler := httpHandler.NewTestHandler(testUsecase)
 
-	router := server.InitiateRouter(userHandler, testHandler, userRepository)
+	router := server.InitiateRouter(userHandler, testHandler, youtubeHandler, youtubeAuthHandler, userRepository)
 
 	if err != nil {
 		logger.GetLogger().WithField("error", err).Error("Error while StartSubscription")
