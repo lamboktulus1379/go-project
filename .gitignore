@@ -41,3 +41,22 @@ tmp/*
 issues
 
 /lint/
+
+# IDE files and directories
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Test scripts
+test_*.sh
+*.sh
+
+# Compiled binaries
+youtube-api
+youtube-api-app
+main
+app
+
+# Local documentation (use docs/ in repo root instead)
+docs/
