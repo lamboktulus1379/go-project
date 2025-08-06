@@ -85,7 +85,7 @@ func main() {
 	pubSubClient, err := pubsub.NewPubSub(ctx, configuration.C.Pubsub.ProjectID)
 	if err != nil {
 		logger.GetLogger().WithField("error", err).Error("Error while instantiate PubSub")
-		// panic(err)
+		pubSubClient = nil // Set to nil for graceful handling
 	}
 
 	azServiceBusClient, err := servicebus.NewServiceBus(ctx, configuration.C.ServiceBus.Namespace)

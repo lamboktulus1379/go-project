@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"cloud.google.com/go/pubsub"
@@ -28,6 +29,11 @@ func (testPubSub *TestPubSub) Publish(
 	topicName string,
 	payload []byte,
 ) (string, error) {
+	// Check if PubSub client is available
+	if testPubSub.PubSubClient == nil {
+		return "pubsub-disabled", nil // Return success but indicate PubSub is disabled
+	}
+
 	msg := &pubsub.Message{
 		Data: payload,
 	}
@@ -60,6 +66,11 @@ func (testPubSub *TestPubSub) GetSubscription(
 	subID string,
 ) (*pubsub.Subscription, error) {
 	logger.GetLogger().WithField("subID", subID).Info("PubSub starting...")
+
+	// Check if PubSub client is available
+	if testPubSub.PubSubClient == nil {
+		return nil, fmt.Errorf("pubsub client is not available")
+	}
 
 	return testPubSub.PubSubClient.Subscription(subID), nil
 }

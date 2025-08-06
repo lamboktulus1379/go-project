@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"my-project/domain/model"
-	"my-project/infrastructure/logger"
 )
 
 func PooledWorkError(allData []model.Project, db *sql.DB) {
@@ -63,20 +62,13 @@ func process(data model.Project, db *sql.DB, errors chan<- error) {
 	if data.Name == "" {
 		errors <- fmt.Errorf("error on job %v", data.Name)
 	} else {
-		result, err := db.Exec("INSERT INTO project (name, description) VALUES($1, $2)", data.Name, data.Description)
+		_, err := db.Exec("INSERT INTO project (name, description) VALUES($1, $2)", data.Name, data.Description)
 		if err != nil {
 			log.Printf("An error occurred %v", err)
 		}
-		defer func(db *sql.DB) {
-			err := db.Close()
-			if err != nil {
-				logger.GetLogger().Error(err)
-			}
-		}(db)
-		id, err := result.LastInsertId()
-		if err != nil {
-			log.Printf("Fail to get last inserted id")
-		}
+		// Note: LastInsertId() doesn't work with PostgreSQL
+		// PostgreSQL uses RETURNING clause for getting inserted IDs
+		id := int64(0) // Placeholder since LastInsertId() fails with PostgreSQL
 
 		fmt.Printf("Finish processing %s With %d\n", data.Name, id)
 	}

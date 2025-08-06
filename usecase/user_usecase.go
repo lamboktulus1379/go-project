@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
+	"log"
 	"time"
 
 	"my-project/domain/dto"
@@ -74,18 +75,27 @@ func (userUsecase *UserUsecase) Login(ctx context.Context, req model.ReqLogin) d
 func (userUcase *UserUsecase) Register(ctx context.Context, req model.ReqRegister) dto.ResRegister {
 	var res dto.ResRegister
 
+	log.Printf("Starting user registration for: %s", req.UserName)
+
 	reqUser := model.User{
 		Name:     req.Name,
 		UserName: req.UserName,
 		Password: req.Password,
 	}
+	
+	log.Printf("Calling CreateUser with: %+v", reqUser)
+	
 	err := userUcase.userRepository.CreateUser(ctx, reqUser)
 	if err != nil {
+		log.Printf("CreateUser failed with error: %v", err)
 		res.Data = nil
 		res.ResponseCode = "500"
 		res.ResponseMessage = "Internal server error"
 		return res
 	}
+	
+	log.Printf("CreateUser succeeded, preparing response")
+	
 	userDto := dto.UserDto{
 		Name:     req.Name,
 		UserName: req.UserName,
