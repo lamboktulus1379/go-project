@@ -34,7 +34,7 @@ func Auth(userRepository repository.IUser) gin.HandlerFunc {
 		}
 		userClaims, token, err := getClaim(auth, secretKey)
 
-		if token.Valid {
+		if token != nil && token.Valid {
 			if !next(ctx, userRepository, userClaims) {
 				ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 				return

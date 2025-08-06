@@ -136,10 +136,10 @@ func main() {
 	}
 
 	// Initialize YouTube client if we have either access tokens OR API key
-	if youtubeConfig != nil && 
+	if youtubeConfig != nil &&
 		((youtubeConfig.AccessToken != "" && youtubeConfig.AccessToken != "your_access_token_here") ||
-		 (youtubeConfig.APIKey != "" && youtubeConfig.APIKey != "YOUR_YOUTUBE_API_KEY")) {
-		
+			(youtubeConfig.APIKey != "" && youtubeConfig.APIKey != "YOUR_YOUTUBE_API_KEY")) {
+
 		// Convert configuration to YouTube client config
 		youtubeClientConfig := &youtubeclient.Config{
 			ClientID:     youtubeConfig.ClientID,
@@ -173,7 +173,8 @@ func main() {
 		logger.GetLogger().WithField("error", err).Error("Error while StartSubscription")
 	}
 
-	Test()
+	// Comment out Test() function to prevent Google Sheets OAuth blocking
+	// Test()
 
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt)

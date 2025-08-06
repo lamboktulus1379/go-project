@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/viper"
 	"my-project/infrastructure/logger"
+
+	"github.com/spf13/viper"
 )
 
 type Config struct {
