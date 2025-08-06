@@ -1,61 +1,61 @@
 {
     "app": {
         "port": "10001",
-        "secretKey": "secret"
+        "secretKey": "your-secret-key-here"
     },
     "googleSheet": {
         "type": "1",
-        "spreadsheetId": "test",
-        "spreadsheetName": "test",
-        "spreadsheetDescription": "test",
-        "spreadsheetColumnReadRange": "test"
+        "spreadsheetId": "your-spreadsheet-id",
+        "spreadsheetName": "your-spreadsheet-name",
+        "spreadsheetDescription": "your-description",
+        "spreadsheetColumnReadRange": "your-range"
     },
     "database": {
         "psql": {
-            "name": "my_project",
+            "name": "your_database_name",
             "host": "localhost",
             "port": "5432",
-            "user": "project",
-            "password": "MyPassword_123"
+            "user": "your_username",
+            "password": "your_password"
         },
         "mysql": {
-            "name": "my_project",
+            "name": "your_database_name",
             "host": "localhost",
             "port": "3306",
-            "user": "project",
-            "password": "MyPassword_123"
+            "user": "your_username",
+            "password": "your_password"
         },
         "mongo": {
-            "name": "my_project",
+            "name": "your_database_name",
             "host": "localhost",
-            "user": "project",
-            "password": "MyPassword_123",
+            "user": "your_username",
+            "password": "your_password",
             "port": "27017",
-            "url": "mongodb+srv://useradmin:password@cluster0.vz5ln.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+            "url": "mongodb://your-connection-string"
         }
     },
     "tulusTech": {
         "header": {
             "contentType": "application/json"
         },
-        "host": "https://tulus.fun",
-        "token": "[token]"
+        "host": "https://your-api-host.com",
+        "token": "your-api-token"
     },
     "data": {
         "source": "googlesheet"
     },
     "pubsub": {
-        "projectID": "sonic-charmer-337916"
+        "projectID": "your-gcp-project-id"
     },
     "serviceBus": {
-        "namespace": "Endpoint=sb://gra-sb-gateway.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=[SharedAccessKey]"
+        "namespace": "your-service-bus-connection-string"
     },
     "redisClient": {
         "username": "default",
-        "password": "MyPassword_123",
-        "host": "redis-18200.c56.east-us.azure.redns.redis-cloud.com",
-        "port": "18200",
-        "databaseName": "cache-M4LG2M2D"
+        "password": "your-redis-password",
+        "host": "your-redis-host",
+        "port": "6379",
+        "databaseName": "your-cache-db"
     },
     "youtube": {
         "apiKey": "YOUR_YOUTUBE_API_KEY",
@@ -69,6 +69,6 @@
         ]
     },
     "logger": {
-        "format": "2006-02-01"
+        "format": "2006-01-02"
     }
 }
