@@ -21,6 +21,9 @@ type Client struct {
 	service     *youtube.Service
 	channelID   string
 	accessToken string
+	oauthConfig *oauth2.Config
+	token       *oauth2.Token
+	ctx         context.Context
 }
 
 // Config represents YouTube API configuration
@@ -48,14 +51,15 @@ func NewYouTubeClient(ctx context.Context, config *Config) (repository.IYouTube,
 		Endpoint: google.Endpoint,
 	}
 
-	// Create token
+	// Create token with expiry time for automatic refresh
 	token := &oauth2.Token{
 		AccessToken:  config.AccessToken,
 		RefreshToken: config.RefreshToken,
 		TokenType:    "Bearer",
+		Expiry:       time.Now().Add(-1 * time.Minute), // Force refresh on first use
 	}
 
-	// Create HTTP client with OAuth2
+	// Create HTTP client with OAuth2 that will auto-refresh tokens
 	httpClient := oauth2Config.Client(ctx, token)
 
 	// Create YouTube service
@@ -68,11 +72,19 @@ func NewYouTubeClient(ctx context.Context, config *Config) (repository.IYouTube,
 		service:     service,
 		channelID:   config.ChannelID,
 		accessToken: config.AccessToken,
+		oauthConfig: oauth2Config,
+		token:       token,
+		ctx:         ctx,
 	}, nil
 }
 
 // GetMyVideos retrieves videos from the authenticated user's channel
 func (c *Client) GetMyVideos(ctx context.Context, req *dto.YouTubeVideoListRequest) (*dto.YouTubeVideoResponse, error) {
+	// Refresh token if needed before making API calls
+	if err := c.refreshTokenIfNeeded(); err != nil {
+		return nil, fmt.Errorf("failed to refresh token: %w", err)
+	}
+
 	channelID := c.channelID
 	if req.ChannelID != "" {
 		channelID = req.ChannelID
@@ -485,6 +497,34 @@ func (c *Client) RemoveVideoFromPlaylist(ctx context.Context, playlistID, videoI
 func (c *Client) GetVideoAnalytics(ctx context.Context, videoID string, startDate, endDate string) (interface{}, error) {
 	// Implementation for getting video analytics
 	return nil, fmt.Errorf("not implemented yet")
+}
+
+// refreshTokenIfNeeded checks if the token is expired and refreshes it automatically
+func (c *Client) refreshTokenIfNeeded() error {
+	// Check if token is expired or about to expire (within 5 minutes)
+	if c.token.Expiry.IsZero() || time.Until(c.token.Expiry) < 5*time.Minute {
+		// Use the oauth2 client to refresh the token automatically
+		newToken, err := c.oauthConfig.TokenSource(c.ctx, c.token).Token()
+		if err != nil {
+			return fmt.Errorf("failed to refresh token: %w", err)
+		}
+		
+		// Update the stored token
+		c.token = newToken
+		c.accessToken = newToken.AccessToken
+		
+		// Recreate the YouTube service with the new token
+		httpClient := c.oauthConfig.Client(c.ctx, newToken)
+		service, err := youtube.NewService(c.ctx, option.WithHTTPClient(httpClient))
+		if err != nil {
+			return fmt.Errorf("failed to recreate YouTube service with refreshed token: %w", err)
+		}
+		c.service = service
+		
+		// Log the token refresh (optional)
+		fmt.Printf("Token refreshed successfully. New expiry: %v\n", newToken.Expiry)
+	}
+	return nil
 }
 
 func (c *Client) GetChannelAnalytics(ctx context.Context, startDate, endDate string) (interface{}, error) {
