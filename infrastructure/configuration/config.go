@@ -18,6 +18,7 @@ type Config struct {
 	ServiceBus  ServiceBus  `json:"serviceBus"`
 	RedisClient RedisClient `json:"redisClient"`
 	Logger      Logger      `json:"logger"`
+	YouTube     YouTube     `json:"youtube"`
 }
 
 type App struct {
@@ -94,6 +95,14 @@ type Logger struct {
 	Format string `json:"format"`
 }
 
+type YouTube struct {
+	APIKey       string   `json:"apiKey"`
+	ClientID     string   `json:"clientId"`
+	ClientSecret string   `json:"clientSecret"`
+	RedirectURI  string   `json:"redirectURI"`
+	Scopes       []string `json:"scopes"`
+}
+
 var C Config
 
 func init() {
@@ -113,10 +122,10 @@ func LoadConfig() {
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			// Config file not found; ignore error if desired
-			fmt.Println("Config file not found")
+			logger.GetLogger().Warn("Config file not found")
 		} else {
 			// Config file was found but another error was produced
-			fmt.Println("An error occurred. ", err)
+			logger.GetLogger().WithField("error", err).Error("Error reading config file")
 		}
 	}
 

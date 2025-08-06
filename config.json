@@ -57,6 +57,17 @@
         "port": "18200",
         "databaseName": "cache-M4LG2M2D"
     },
+    "youtube": {
+        "apiKey": "YOUR_YOUTUBE_API_KEY",
+        "clientId": "YOUR_YOUTUBE_CLIENT_ID",
+        "clientSecret": "YOUR_YOUTUBE_CLIENT_SECRET",
+        "redirectURI": "http://localhost:10001/auth/youtube/callback",
+        "scopes": [
+            "https://www.googleapis.com/auth/youtube.readonly",
+            "https://www.googleapis.com/auth/youtube.upload",
+            "https://www.googleapis.com/auth/youtube.force-ssl"
+        ]
+    },
     "logger": {
         "format": "2006-02-01"
     }

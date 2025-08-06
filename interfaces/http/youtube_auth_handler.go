@@ -89,8 +89,6 @@ func (h *YouTubeAuthHandler) HandleCallback(ctx *gin.Context) {
 
 	// For development purposes, we'll skip strict state validation entirely
 	// In production, you should implement proper state validation with secure storage
-	fmt.Printf("Received state: %s\n", state)
-	fmt.Printf("Skipping state validation for development\n")
 
 	// Get authorization code
 	code := ctx.Query("code")

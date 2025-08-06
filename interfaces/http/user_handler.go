@@ -3,13 +3,13 @@ package http
 import (
 	"crypto/md5"
 	"fmt"
-	"log"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"my-project/domain/model"
 	"my-project/infrastructure/logger"
 	"my-project/usecase"
+
+	"github.com/gin-gonic/gin"
 )
 
 const (
@@ -47,21 +47,15 @@ func (userHandler *UserHandler) Register(c *gin.Context) {
 	var req model.ReqRegister
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Printf("JSON binding error: %v", err)
+		logger.GetLogger().WithField("error", err).Error(ErrorUnmarshal)
 		c.JSON(http.StatusBadRequest, fmt.Sprintf("An error occurred: %v", err.Error()))
 		return
 	}
-	
-	log.Printf("Registration request received: %+v", req)
-	
+
 	data := []byte(req.Password)
 	req.Password = fmt.Sprintf("%x", md5.Sum(data))
-	
-	log.Printf("Hashed password: %s", req.Password)
-	
+
 	res := userHandler.userUsecase.Register(c.Request.Context(), req)
-	
-	log.Printf("Registration response: %+v", res)
 
 	c.JSON(http.StatusOK, res)
 }

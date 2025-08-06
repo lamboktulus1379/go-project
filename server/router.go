@@ -22,16 +22,13 @@ func InitiateRouter(
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:4200", "http://localhost:3000", "https://tulus.tech"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Accept", "X-Requested-With"},
-		ExposeHeaders:    []string{"Content-Length", "Authorization"},
+		AllowOrigins:     []string{"https://tulus.tech", "http://localhost:4201", "http://localhost:4200"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
+		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		AllowOriginFunc: func(origin string) bool {
-			// Allow localhost for development
-			return origin == "http://localhost:4200" || 
-				   origin == "http://localhost:3000" || 
-				   origin == "https://tulus.tech"
+			return origin == "https://tulus.tech" || origin == "http://localhost:4201" || origin == "http://localhost:4200"
 		},
 		MaxAge: 12 * time.Hour,
 	}))
@@ -53,6 +50,38 @@ func InitiateRouter(
 		router.GET("/test/youtube/videos", youtubeHandler.GetMyVideos)
 		router.GET("/test/youtube/search", youtubeHandler.SearchVideos)
 		router.GET("/test/youtube/channel", youtubeHandler.GetMyChannel)
+	} else {
+		// Fallback mock endpoint if YouTube handler is not available
+		router.GET("/test/youtube/videos", func(ctx *gin.Context) {
+			ctx.Header("Access-Control-Allow-Origin", "*")
+			ctx.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			ctx.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, X-Requested-With")
+
+			ctx.JSON(http.StatusOK, gin.H{
+				"error":   false,
+				"message": "YouTube API not configured - returning mock data",
+				"data": []gin.H{
+					{
+						"id":          "mock-video-1",
+						"title":       "Sample Video 1",
+						"description": "This is a mock video for testing",
+						"thumbnail":   "https://via.placeholder.com/320x180",
+						"viewCount":   "1234",
+						"likeCount":   "56",
+						"publishedAt": "2025-08-06T00:00:00Z",
+					},
+					{
+						"id":          "mock-video-2",
+						"title":       "Sample Video 2",
+						"description": "Another mock video for testing",
+						"thumbnail":   "https://via.placeholder.com/320x180",
+						"viewCount":   "5678",
+						"likeCount":   "89",
+						"publishedAt": "2025-08-05T00:00:00Z",
+					},
+				},
+			})
+		})
 	}
 
 	router.POST("/healthz", testHandler.Test)
@@ -93,14 +122,96 @@ func InitiateRouter(
 			youtube.POST("/playlists", youtubeHandler.CreatePlaylist)
 		}
 	} else {
-		// Add info endpoint when YouTube is not configured
-		api.GET("/youtube/info", func(ctx *gin.Context) {
-			ctx.JSON(http.StatusServiceUnavailable, gin.H{
-				"error":       "YouTube API not configured",
-				"message":     "Please configure YouTube API credentials to enable YouTube features",
-				"setup_guide": "/docs/YOUTUBE_API_SETUP.md",
+		// Add fallback endpoints when YouTube is not configured
+		youtube := api.Group("/youtube")
+		{
+			youtube.GET("/videos", func(ctx *gin.Context) {
+				ctx.JSON(http.StatusOK, gin.H{
+					"error":   false,
+					"message": "YouTube API not configured - returning mock data",
+					"data": []gin.H{
+						{
+							"id":          "mock-video-1",
+							"title":       "Sample Video 1",
+							"description": "This is a mock video for testing",
+							"thumbnail":   "https://via.placeholder.com/320x180",
+							"viewCount":   "1234",
+							"likeCount":   "56",
+							"publishedAt": "2025-08-06T00:00:00Z",
+						},
+						{
+							"id":          "mock-video-2",
+							"title":       "Sample Video 2",
+							"description": "Another mock video for testing",
+							"thumbnail":   "https://via.placeholder.com/320x180",
+							"viewCount":   "5678",
+							"likeCount":   "89",
+							"publishedAt": "2025-08-05T00:00:00Z",
+						},
+					},
+				})
 			})
-		})
+
+			youtube.GET("/videos/:videoId", func(ctx *gin.Context) {
+				videoId := ctx.Param("videoId")
+				ctx.JSON(http.StatusOK, gin.H{
+					"error":   false,
+					"message": "YouTube API not configured - returning mock data",
+					"data": gin.H{
+						"id":          videoId,
+						"title":       "Mock Video Details",
+						"description": "This is a mock video detail for testing",
+						"thumbnail":   "https://via.placeholder.com/320x180",
+						"viewCount":   "1234",
+						"likeCount":   "56",
+						"publishedAt": "2025-08-06T00:00:00Z",
+						"url":         "https://www.youtube.com/watch?v=" + videoId,
+					},
+				})
+			})
+
+			youtube.GET("/channel", func(ctx *gin.Context) {
+				ctx.JSON(http.StatusOK, gin.H{
+					"error":   false,
+					"message": "YouTube API not configured - returning mock data",
+					"data": gin.H{
+						"id":              "mock-channel-id",
+						"title":           "Mock Channel",
+						"description":     "This is a mock channel for testing",
+						"subscriberCount": "1000",
+						"viewCount":       "50000",
+						"videoCount":      "25",
+					},
+				})
+			})
+
+			youtube.GET("/search", func(ctx *gin.Context) {
+				query := ctx.Query("q")
+				ctx.JSON(http.StatusOK, gin.H{
+					"error":   false,
+					"message": "YouTube API not configured - returning mock search results",
+					"query":   query,
+					"data": []gin.H{
+						{
+							"id":          "search-result-1",
+							"title":       "Search Result 1 for: " + query,
+							"description": "Mock search result",
+							"thumbnail":   "https://via.placeholder.com/320x180",
+							"viewCount":   "999",
+						},
+					},
+				})
+			})
+
+			// For other endpoints, return a "not configured" message
+			youtube.GET("/info", func(ctx *gin.Context) {
+				ctx.JSON(http.StatusServiceUnavailable, gin.H{
+					"error":       "YouTube API not configured",
+					"message":     "Please configure YouTube API credentials to enable YouTube features",
+					"setup_guide": "/docs/YOUTUBE_API_SETUP.md",
+				})
+			})
+		}
 	}
 
 	return router

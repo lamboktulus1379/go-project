@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"cloud.google.com/go/pubsub"
 	"my-project/infrastructure/logger"
+
+	"cloud.google.com/go/pubsub"
 )
 
 type ITestPubSub interface {

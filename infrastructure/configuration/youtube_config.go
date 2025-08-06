@@ -3,6 +3,7 @@ package configuration
 import (
 	"errors"
 	"os"
+	"strings"
 )
 
 // YouTubeConfig represents YouTube API configuration
@@ -13,28 +14,43 @@ type YouTubeConfig struct {
 	AccessToken  string `mapstructure:"access_token"`
 	RefreshToken string `mapstructure:"refresh_token"`
 	ChannelID    string `mapstructure:"channel_id"`
+	APIKey       string `mapstructure:"api_key"`
 }
 
-// GetYouTubeConfig returns YouTube configuration from environment variables or config file
+// GetYouTubeConfig returns YouTube configuration from JSON config with environment variable fallback
 func GetYouTubeConfig() (*YouTubeConfig, error) {
 	config := &YouTubeConfig{
-		ClientID:     getEnv("YOUTUBE_CLIENT_ID", ""),
-		ClientSecret: getEnv("YOUTUBE_CLIENT_SECRET", ""),
-		RedirectURL:  getEnv("YOUTUBE_REDIRECT_URL", "http://localhost:8080/auth/youtube/callback"),
+		ClientID:     getConfigValue(C.YouTube.ClientID, "YOUTUBE_CLIENT_ID", ""),
+		ClientSecret: getConfigValue(C.YouTube.ClientSecret, "YOUTUBE_CLIENT_SECRET", ""),
+		RedirectURL:  getConfigValue(C.YouTube.RedirectURI, "YOUTUBE_REDIRECT_URL", "http://localhost:10001/auth/youtube/callback"),
 		AccessToken:  getEnv("YOUTUBE_ACCESS_TOKEN", ""),
 		RefreshToken: getEnv("YOUTUBE_REFRESH_TOKEN", ""),
 		ChannelID:    getEnv("YOUTUBE_CHANNEL_ID", ""),
+		APIKey:       getConfigValue(C.YouTube.APIKey, "YOUTUBE_API_KEY", ""),
 	}
 
 	// Validate required fields
-	if config.ClientID == "" {
-		return nil, errors.New("YOUTUBE_CLIENT_ID is required")
+	if config.ClientID == "" || config.ClientID == "YOUR_YOUTUBE_CLIENT_ID" {
+		return nil, errors.New("YOUTUBE_CLIENT_ID is required. Please set it in config.json or environment variable")
 	}
-	if config.ClientSecret == "" {
-		return nil, errors.New("YOUTUBE_CLIENT_SECRET is required")
+	if config.ClientSecret == "" || config.ClientSecret == "YOUR_YOUTUBE_CLIENT_SECRET" {
+		return nil, errors.New("YOUTUBE_CLIENT_SECRET is required. Please set it in config.json or environment variable")
+	}
+	if config.APIKey == "" || config.APIKey == "YOUR_YOUTUBE_API_KEY" {
+		return nil, errors.New("YOUTUBE_API_KEY is required. Please set it in config.json or environment variable")
 	}
 
 	return config, nil
+}
+
+// getConfigValue gets value from config first, then environment variable, then default
+func getConfigValue(configValue, envKey, defaultValue string) string {
+	// If config value is set and not a placeholder, use it
+	if configValue != "" && !strings.HasPrefix(configValue, "YOUR_") {
+		return configValue
+	}
+	// Otherwise fall back to environment variable
+	return getEnv(envKey, defaultValue)
 }
 
 // getEnv gets environment variable with default value

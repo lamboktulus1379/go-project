@@ -3,16 +3,16 @@ package middleware
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"strings"
 
-	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt"
 	"my-project/domain/dto"
 	"my-project/domain/model"
 	"my-project/domain/repository"
+	"my-project/infrastructure/configuration"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt"
 )
 
 func Auth(userRepository repository.IUser) gin.HandlerFunc {
@@ -20,16 +20,14 @@ func Auth(userRepository repository.IUser) gin.HandlerFunc {
 	res.ResponseCode = "401"
 	res.ResponseMessage = "Unauthorized"
 
-	log.Println("Inside auth middleware")
 	return func(ctx *gin.Context) {
 		authorization := ctx.Request.Header.Get("Authorization")
-		secretKey := os.Getenv("SECRET_KEY")
+		secretKey := configuration.C.App.SecretKey
 		if authorization == "" {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
 		}
 		auth := strings.Split(authorization, "Bearer ")
-		fmt.Println("Auth:", auth[1])
 		if len(auth) != 2 {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
 			return
@@ -67,15 +65,13 @@ func abort(err error, res dto.Res) bool {
 }
 
 func next(ctx *gin.Context, userRepository repository.IUser, userClaims model.UserClaims) bool {
-	fmt.Println("You look nice today")
 	_, err := userRepository.GetByUserName(ctx.Request.Context(), userClaims.UserName)
 	if err != nil {
-		fmt.Println("User not found")
-		return true
+		return false // Return false to indicate authorization failed
 	}
 	ctx.Set("user_id", userClaims.Issuer)
 	ctx.Next()
-	return false
+	return true // Return true to indicate authorization succeeded
 }
 
 func getClaim(auth []string, secretKey string) (model.UserClaims, *jwt.Token, error) {
@@ -87,6 +83,5 @@ func getClaim(auth []string, secretKey string) (model.UserClaims, *jwt.Token, er
 			return []byte(secretKey), nil
 		},
 	)
-	fmt.Printf("Claims: %+v\n", userClaims)
 	return userClaims, token, err
 }

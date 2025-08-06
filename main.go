@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -33,7 +32,7 @@ var httpServer *http.Server
 
 func recoverPanic() {
 	if err := recover(); err != nil {
-		fmt.Printf("RECOVERED: %v\n", err)
+		logger.GetLogger().WithField("error", err).Error("Application panic recovered")
 	}
 }
 
@@ -56,7 +55,7 @@ func main() {
 
 	mysqlDb, psqlDb, err := InitiateDatabase()
 	if err != nil {
-		fmt.Println(err)
+		logger.GetLogger().WithField("error", err).Error("Database initialization failed")
 	}
 
 	mongoDb, err := persistence.NewMongoDb(
@@ -75,7 +74,7 @@ func main() {
 		logger.GetLogger().WithField("error", err).Error("Error while Ping MongoDB")
 		panic(err)
 	}
-	fmt.Println("MongoDB connected")
+	logger.GetLogger().Info("MongoDB connected successfully")
 
 	logger.GetLogger().
 		WithField("MySQLDb", mysqlDb.Ping()).
@@ -105,7 +104,7 @@ func main() {
 	if err != nil {
 		logger.GetLogger().WithField("error", err).Error("Error while fetching data")
 	}
-	fmt.Printf("Project %v\n", project)
+	logger.GetLogger().WithField("project", project).Info("Test project data retrieved")
 	testCache := cache.NewTestCache(redisClient)
 
 	logger.GetLogger().Info("Redis client initialized successfully.")
@@ -118,8 +117,6 @@ func main() {
 	userRepository := persistence.NewUserRepository(psqlDb)
 	userUsecase := usecase.NewUserUsecase(userRepository)
 	testUsecase := usecase.NewTestUsecase(tulusTechHost, testPubSub, testServiceBus, testCache)
-	// testRes := testUsecase.Test(ctx)
-	// fmt.Println("Test response", testRes)
 
 	// Initialize YouTube components
 	youtubeConfig, err := configuration.GetYouTubeConfig()
@@ -138,8 +135,11 @@ func main() {
 		youtubeAuthHandler = nil
 	}
 
-	// Only initialize YouTube client if we have access tokens
-	if youtubeConfig != nil && youtubeConfig.AccessToken != "" && youtubeConfig.AccessToken != "your_access_token_here" {
+	// Initialize YouTube client if we have either access tokens OR API key
+	if youtubeConfig != nil && 
+		((youtubeConfig.AccessToken != "" && youtubeConfig.AccessToken != "your_access_token_here") ||
+		 (youtubeConfig.APIKey != "" && youtubeConfig.APIKey != "YOUR_YOUTUBE_API_KEY")) {
+		
 		// Convert configuration to YouTube client config
 		youtubeClientConfig := &youtubeclient.Config{
 			ClientID:     youtubeConfig.ClientID,
@@ -161,7 +161,7 @@ func main() {
 			logger.GetLogger().Info("YouTube API client initialized successfully")
 		}
 	} else {
-		logger.GetLogger().Info("YouTube access tokens not configured - only OAuth authentication will be available")
+		logger.GetLogger().Info("YouTube API credentials not configured - YouTube features will be disabled (using mock data)")
 	}
 
 	userHandler := httpHandler.NewUserHandler(userUsecase)
@@ -200,7 +200,7 @@ func main() {
 
 	select {
 	case <-interrupt:
-		fmt.Println("Exit")
+		logger.GetLogger().Info("Application shutdown requested")
 		os.Exit(1)
 	case <-ctx.Done():
 		break
@@ -216,7 +216,7 @@ func main() {
 
 	err = g.Wait()
 	if err != nil {
-		log.Printf("server returning an error %v", err)
+		logger.GetLogger().WithField("error", err).Error("Server returned an error")
 		os.Exit(2)
 	}
 }
@@ -239,10 +239,12 @@ func InitiateDatabase() (*sql.DB, *sql.DB, error) {
 }
 
 func InitiateGoroutine() {
-	fmt.Println("Hello World!")
+	logger.GetLogger().Info("Initializing goroutines")
 
 	for i := 0; i < 10; i++ {
-		go fmt.Println(i)
+		go func(id int) {
+			logger.GetLogger().WithField("goroutine_id", id).Debug("Goroutine started")
+		}(i)
 	}
 }
 
