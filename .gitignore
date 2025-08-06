@@ -31,10 +31,19 @@ config.env
 config-*.env
 *.env
 
+# Configuration files with sensitive data
+config.json
+config.toml
+config-*.json
+config-*.toml
+
 # Credentials and secrets
 credentials.json
 client_secret_*.json
 service-account-*.json
+*.key
+*.pem
+*.p12
 
 # Log
 logs
