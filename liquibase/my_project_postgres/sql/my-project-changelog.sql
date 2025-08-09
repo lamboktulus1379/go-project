@@ -89,3 +89,11 @@ CREATE TABLE IF NOT EXISTS public.oauth_tokens (
     CONSTRAINT uq_user_platform UNIQUE (user_id, platform)
 );
 --rollback DROP TABLE IF EXISTS public.oauth_tokens;
+
+--changeset lamboktulus1379:7 labels:share-feature context:share
+--comment: add page and token type fields for facebook page posting
+ALTER TABLE public.oauth_tokens
+    ADD COLUMN IF NOT EXISTS page_id VARCHAR(128) NULL,
+    ADD COLUMN IF NOT EXISTS page_name VARCHAR(255) NULL,
+    ADD COLUMN IF NOT EXISTS token_type VARCHAR(32) NULL; -- user | page
+--rollback ALTER TABLE public.oauth_tokens DROP COLUMN IF EXISTS token_type; ALTER TABLE public.oauth_tokens DROP COLUMN IF EXISTS page_name; ALTER TABLE public.oauth_tokens DROP COLUMN IF EXISTS page_id;
