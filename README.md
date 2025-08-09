@@ -11,6 +11,7 @@
 - [Installation](#installation)
 - [Usage](#usage)
 - [License](#license)
+ - [Migrations](#migrations)
 
 ## Description
 This project is a Go REST API with comprehensive user management and YouTube API integration. It provides endpoints for user authentication, video management, channel operations, and comment handling.
@@ -385,13 +386,46 @@ Update CORS settings in `/server/router.go` for your frontend domain.
    ```
 
 2. Run Liquibase migrations:
-   ```bash
-   liquibase --changelog-file=liquibase/my_project_postgres/yaml/db.changelog-master.yaml \
-             --url=jdbc:postgresql://localhost:5432/my_project \
-             --username=project \
-             --password=MyPassword_123 \
-             update
-   ```
+  #### PostgreSQL (current changelog used in this repo)
+  The project uses an SQL formatted changelog at `liquibase/my_project_postgres/sql/my-project-changelog.sql`.
+
+  Common commands (run from repo root):
+  ```bash
+  # Preview SQL without applying
+  (cd liquibase/my_project_postgres/sql && liquibase updateSQL)
+
+  # Apply all pending changesets
+  (cd liquibase/my_project_postgres/sql && liquibase update)
+
+  # Clear and recalculate checksums (only if a committed changeset was edited)
+  (cd liquibase/my_project_postgres/sql && liquibase clearChecksums)
+
+  # Roll back last changeset (example)
+  (cd liquibase/my_project_postgres/sql && liquibase rollbackCount 1)
+  ```
+
+  Properties file (`liquibase/my_project_postgres/sql/liquibase.properties`) supplies:
+  ```properties
+  changeLogFile=my-project-changelog.sql
+  liquibase.command.url=jdbc:postgresql://localhost:5432/my_project
+  liquibase.command.username=project
+  liquibase.command.password=MyPassword_123
+  ```
+
+  #### MySQL (alternative / legacy)
+  A MySQL variant changelog exists at `liquibase/my-project/sql/my-project-changelog.sql` (includes share tables).
+
+  ```bash
+  # Preview
+  (cd liquibase/my-project/sql && liquibase updateSQL)
+  # Apply
+  (cd liquibase/my-project/sql && liquibase update)
+  ```
+
+  NOTE: The application ShareRepository currently uses the MySQL connection; if you decide to switch sharing to PostgreSQL ensure the repository SQL and DSN align.
+
+## Migrations
+For full details (adding changesets, rollback, dual-DB strategy) see [docs/MIGRATIONS.md](./docs/MIGRATIONS.md).
 
 ## Installation
 

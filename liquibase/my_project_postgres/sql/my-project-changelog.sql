@@ -29,3 +29,63 @@ CREATE TABLE public.project
     updated_at time with time zone DEFAULT CURRENT_TIMESTAMP
 );
 --rollback DROP TABLE public.project;
+
+--changeset lamboktulus1379:3 labels:share-feature context:share
+--comment: create share tracking table (video_share_records) for social platforms
+CREATE TABLE IF NOT EXISTS public.video_share_records (
+    id BIGSERIAL PRIMARY KEY,
+    video_id VARCHAR(128) NOT NULL,
+    platform VARCHAR(32) NOT NULL,
+    user_id VARCHAR(128) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending', -- pending | success | failed
+    error_message TEXT NULL,
+    attempt_count INTEGER NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_video_platform_user UNIQUE (video_id, platform, user_id)
+);
+--rollback DROP TABLE IF EXISTS public.video_share_records;
+
+--changeset lamboktulus1379:4 labels:share-feature context:share
+--comment: append-only audit log of share attempts
+CREATE TABLE IF NOT EXISTS public.video_share_audit (
+    id BIGSERIAL PRIMARY KEY,
+    record_id BIGINT NOT NULL REFERENCES public.video_share_records(id) ON DELETE CASCADE,
+    video_id VARCHAR(128) NOT NULL,
+    platform VARCHAR(32) NOT NULL,
+    user_id VARCHAR(128) NOT NULL,
+    status VARCHAR(16) NOT NULL,
+    error_message TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+--rollback DROP TABLE IF EXISTS public.video_share_audit;
+
+--changeset lamboktulus1379:5 labels:share-feature context:share
+--comment: job queue for server_post processing
+CREATE TABLE IF NOT EXISTS public.share_jobs (
+    id BIGSERIAL PRIMARY KEY,
+    record_id BIGINT NOT NULL REFERENCES public.video_share_records(id) ON DELETE CASCADE,
+    platform VARCHAR(32) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending', -- pending | running | success | failed
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+--rollback DROP TABLE IF EXISTS public.share_jobs;
+
+--changeset lamboktulus1379:6 labels:share-feature context:share
+--comment: oauth tokens per user/platform for future automatic posting
+CREATE TABLE IF NOT EXISTS public.oauth_tokens (
+    id BIGSERIAL PRIMARY KEY,
+    user_id VARCHAR(128) NOT NULL,
+    platform VARCHAR(32) NOT NULL,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NULL,
+    expires_at TIMESTAMPTZ NULL DEFAULT NULL,
+    scopes TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_user_platform UNIQUE (user_id, platform)
+);
+--rollback DROP TABLE IF EXISTS public.oauth_tokens;

@@ -68,6 +68,21 @@
             "https://www.googleapis.com/auth/youtube.force-ssl"
         ]
     },
+    "share": {
+        "platforms": ["twitter", "facebook", "whatsapp"]
+    },
+    "oauth": {
+        "facebook": {
+            "clientId": "YOUR_FACEBOOK_APP_ID",
+            "clientSecret": "YOUR_FACEBOOK_APP_SECRET",
+            "redirectURI": "http://localhost:10001/auth/facebook/callback"
+        },
+        "twitter": {
+            "clientId": "YOUR_TWITTER_CLIENT_ID",
+            "clientSecret": "YOUR_TWITTER_CLIENT_SECRET",
+            "redirectURI": "http://localhost:10001/auth/twitter/callback"
+        }
+    },
     "logger": {
         "format": "2006-01-02"
     }

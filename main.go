@@ -170,7 +170,7 @@ func main() {
 		if err != nil {
 			logger.GetLogger().WithField("error", err).Warn("Failed to initialize YouTube client - YouTube features will be disabled")
 		} else {
-			// Initialize YouTube use case and handler
+			// Initialize YouTube use case and handler (assign to outer variable)
 			youtubeUsecase := usecase.NewYouTubeUseCase(youtubeClient)
 			youtubeHandler = httpHandler.NewYouTubeHandler(youtubeUsecase)
 			logger.GetLogger().Info("YouTube API client initialized successfully; registering YouTube routes including PATCH /api/youtube/videos/:videoId")
@@ -182,7 +182,36 @@ func main() {
 	userHandler := httpHandler.NewUserHandler(userUsecase)
 	testHandler := httpHandler.NewTestHandler(testUsecase)
 
-	router := server.InitiateRouter(userHandler, testHandler, youtubeHandler, youtubeAuthHandler, userRepository)
+	// Share feature wiring (now using PostgreSQL DB)
+	shareRepo := persistence.NewShareRepository(psqlDb)
+	oauthRepo := persistence.NewOAuthTokenRepository(mysqlDb)
+	var shareHandler httpHandler.IShareHandler
+	if len(configuration.C.Share.Platforms) == 0 {
+		configuration.C.Share.Platforms = []string{"twitter","facebook","whatsapp"}
+	}
+	shareUsecase := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms)
+	shareHandler = httpHandler.NewShareHandler(shareUsecase, configuration.C.Share.Platforms)
+
+	router := server.InitiateRouter(userHandler, testHandler, youtubeHandler, youtubeAuthHandler, userRepository, shareHandler)
+
+	// Background share job processor (simple ticker loop)
+	if shareHandler != nil {
+		g.Go(func() error {
+			ticker := time.NewTicker(15 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-ticker.C:
+					// Process up to N pending jobs each tick
+					procCtx, cancelProc := context.WithTimeout(ctx, 5*time.Second)
+					_ = usecase.ProcessShareJobs(procCtx, shareRepo, oauthRepo, 10)
+					cancelProc()
+				}
+			}
+		})
+	}
 
 	if err != nil {
 		logger.GetLogger().WithField("error", err).Error("Error while StartSubscription")

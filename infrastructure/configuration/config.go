@@ -20,6 +20,8 @@ type Config struct {
 	RedisClient RedisClient `json:"redisClient"`
 	Logger      Logger      `json:"logger"`
 	YouTube     YouTube     `json:"youtube"`
+	Share       Share       `json:"share"`
+	OAuth       OAuth       `json:"oauth"`
 }
 
 type App struct {
@@ -102,6 +104,24 @@ type YouTube struct {
 	ClientSecret string   `json:"clientSecret"`
 	RedirectURI  string   `json:"redirectURI"`
 	Scopes       []string `json:"scopes"`
+}
+
+// Share holds share platform configuration
+type Share struct {
+	Platforms []string `json:"platforms"`
+}
+
+// OAuth holds third-party platform OAuth client credentials
+type OAuth struct {
+	Facebook OAuthClient `json:"facebook"`
+	Twitter  OAuthClient `json:"twitter"`
+}
+
+type OAuthClient struct {
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+	RedirectURI  string `json:"redirectURI"`
+	// Additional fields (scopes, etc) can be added later
 }
 
 var C Config

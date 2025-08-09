@@ -18,6 +18,7 @@ func InitiateRouter(
 	youtubeHandler httpHandler.IYouTubeHandler,
 	youtubeAuthHandler httpHandler.IYouTubeAuthHandler,
 	userRepository repository.IUser,
+	shareHandler httpHandler.IShareHandler,
 ) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -91,6 +92,11 @@ func InitiateRouter(
 		ctx.JSON(http.StatusOK, res)
 	})
 
+	// Share platform capability endpoint (not tied to YouTube availability)
+	if shareHandler != nil {
+		api.GET("/share/platforms", shareHandler.GetPlatforms)
+	}
+
 	// YouTube API routes (only if handler is available)
 	if youtubeHandler != nil {
 		youtube := api.Group("/youtube")
@@ -122,6 +128,9 @@ func InitiateRouter(
 			// Playlist operations
 			youtube.GET("/playlists", youtubeHandler.GetMyPlaylists)
 			youtube.POST("/playlists", youtubeHandler.CreatePlaylist)
+			// Share endpoints (video social sharing)
+			youtube.POST("/videos/:videoId/share", func(c *gin.Context) { if shareHandler!=nil { shareHandler.ShareVideo(c); return }; c.JSON(http.StatusNotImplemented, gin.H{"error":"share handler not configured"}) })
+			youtube.GET("/videos/:videoId/share-status", func(c *gin.Context) { if shareHandler!=nil { shareHandler.GetShareStatus(c); return }; c.JSON(http.StatusNotImplemented, gin.H{"error":"share handler not configured"}) })
 		}
 	} else {
 		// Add fallback endpoints when YouTube is not configured
