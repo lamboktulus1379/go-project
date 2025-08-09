@@ -22,6 +22,7 @@ import (
 type IFacebookOAuthHandler interface {
     GetAuthURL(ctx *gin.Context)
     Callback(ctx *gin.Context)
+    Status(ctx *gin.Context)
 }
 
 type facebookOAuthHandler struct {
@@ -202,5 +203,25 @@ func (h *facebookOAuthHandler) Callback(c *gin.Context) {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "store_token_failed"})
         return
     }
+    if c.Query("frontend") == "1" {
+        c.Header("Content-Type", "text/html; charset=utf-8")
+        _, _ = c.Writer.Write([]byte(fmt.Sprintf(`<!DOCTYPE html><html><head><title>Facebook Connected</title></head><body><script>if (window.opener){window.opener.postMessage({source:'facebook-oauth',connected:true,page_id:'%s',page_name:%q},'*');window.close();}else{document.write('Facebook connected: %s');}</script></body></html>`, selected.ID, selected.Name, selected.Name)))
+        return
+    }
     c.JSON(http.StatusOK, gin.H{"connected": true, "page_id": selected.ID, "page_name": selected.Name})
+}
+
+// Status returns whether a facebook page token is stored
+func (h *facebookOAuthHandler) Status(c *gin.Context) {
+    userID := c.GetString("user_id")
+    if userID == "" { userID = "demo-user" }
+    tok, err := h.tokenRepo.GetToken(c.Request.Context(), userID, "facebook")
+    if err != nil || tok == nil || tok.AccessToken == "" {
+        c.JSON(http.StatusOK, gin.H{"connected": false})
+        return
+    }
+    resp := gin.H{"connected": true}
+    if tok.PageID != nil { resp["page_id"] = *tok.PageID }
+    if tok.PageName != nil { resp["page_name"] = *tok.PageName }
+    c.JSON(http.StatusOK, resp)
 }

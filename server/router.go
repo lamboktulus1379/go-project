@@ -49,6 +49,7 @@ func InitiateRouter(
 	if facebookOAuthHandler != nil {
 		router.GET("/auth/facebook", facebookOAuthHandler.GetAuthURL)
 		router.GET("/auth/facebook/callback", facebookOAuthHandler.Callback)
+		api.GET("/facebook/status", facebookOAuthHandler.Status)
 	}
 
 	// Temporary test route for YouTube API (bypasses authentication)
