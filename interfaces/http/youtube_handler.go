@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"my-project/domain/dto"
 	"my-project/usecase"
@@ -195,7 +196,17 @@ func (h *YouTubeHandler) UpdateVideo(ctx *gin.Context) {
 
 	updated, err := h.youtubeUseCase.UpdateVideo(ctx.Request.Context(), videoID, &req)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update video", "message": err.Error()})
+		status := http.StatusInternalServerError
+		msg := err.Error()
+		// Map known guidance fragments to status codes
+		if strings.Contains(msg, "requires OAuth credentials") {
+			status = http.StatusUnauthorized
+		} else if strings.Contains(msg, "code 401") {
+			status = http.StatusUnauthorized
+		} else if strings.Contains(msg, "code 403") {
+			status = http.StatusForbidden
+		}
+		ctx.JSON(status, gin.H{"error": "Failed to update video", "message": msg})
 		return
 	}
 

@@ -2,6 +2,7 @@ package youtube
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,9 +10,11 @@ import (
 	"my-project/domain/dto"
 	"my-project/domain/model"
 	"my-project/domain/repository"
+	"my-project/infrastructure/logger"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
 )
@@ -24,6 +27,15 @@ type Client struct {
 	oauthConfig *oauth2.Config
 	token       *oauth2.Token
 	ctx         context.Context
+}
+
+// keys returns the map's keys as a slice of strings for logging
+func keys(m map[string]interface{}) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
 }
 
 // Config represents YouTube API configuration
@@ -203,7 +215,32 @@ func (c *Client) GetVideoDetails(ctx context.Context, videoID string) (*model.Yo
 
 // convertToYouTubeVideo converts YouTube API video to our model
 func (c *Client) convertToYouTubeVideo(video *youtube.Video) model.YouTubeVideo {
-	publishedAt, _ := time.Parse(time.RFC3339, video.Snippet.PublishedAt)
+	var publishedAt time.Time
+	var title, description, channelID, channelTitle, categoryID, duration, status string
+	var tags []string
+
+	// Snippet safe extraction
+	if video.Snippet != nil {
+		if video.Snippet.PublishedAt != "" {
+			if ts, err := time.Parse(time.RFC3339, video.Snippet.PublishedAt); err == nil {
+				publishedAt = ts
+			}
+		}
+		title = video.Snippet.Title
+		description = video.Snippet.Description
+		channelID = video.Snippet.ChannelId
+		channelTitle = video.Snippet.ChannelTitle
+		categoryID = video.Snippet.CategoryId
+		tags = video.Snippet.Tags
+	}
+
+	if video.ContentDetails != nil {
+		duration = video.ContentDetails.Duration
+	}
+
+	if video.Status != nil {
+		status = video.Status.PrivacyStatus
+	}
 
 	var viewCount, likeCount int64
 	if video.Statistics != nil {
@@ -213,35 +250,36 @@ func (c *Client) convertToYouTubeVideo(video *youtube.Video) model.YouTubeVideo 
 
 	ytVideo := model.YouTubeVideo{
 		ID:          video.Id,
-		Title:       video.Snippet.Title,
-		Description: video.Snippet.Description,
+		Title:       title,
+		Description: description,
 		PublishedAt: publishedAt,
-		ChannelID:   video.Snippet.ChannelId,
-		ChannelName: video.Snippet.ChannelTitle,
+		ChannelID:   channelID,
+		ChannelName: channelTitle,
 		ViewCount:   viewCount,
 		LikeCount:   likeCount,
-		Duration:    video.ContentDetails.Duration,
-		Tags:        video.Snippet.Tags,
-		Status:      video.Status.PrivacyStatus,
-		Category:    video.Snippet.CategoryId,
+		Duration:    duration,
+		Tags:        tags,
+		Status:      status,
+		Category:    categoryID,
 	}
 
-	// Set thumbnails
-	if video.Snippet.Thumbnails != nil {
-		if video.Snippet.Thumbnails.Default != nil {
-			ytVideo.Thumbnails.Default.URL = video.Snippet.Thumbnails.Default.Url
-			ytVideo.Thumbnails.Default.Width = int(video.Snippet.Thumbnails.Default.Width)
-			ytVideo.Thumbnails.Default.Height = int(video.Snippet.Thumbnails.Default.Height)
+	// Thumbnails (nil-safe)
+	if video.Snippet != nil && video.Snippet.Thumbnails != nil {
+		thumbs := video.Snippet.Thumbnails
+		if thumbs.Default != nil {
+			ytVideo.Thumbnails.Default.URL = thumbs.Default.Url
+			ytVideo.Thumbnails.Default.Width = int(thumbs.Default.Width)
+			ytVideo.Thumbnails.Default.Height = int(thumbs.Default.Height)
 		}
-		if video.Snippet.Thumbnails.Medium != nil {
-			ytVideo.Thumbnails.Medium.URL = video.Snippet.Thumbnails.Medium.Url
-			ytVideo.Thumbnails.Medium.Width = int(video.Snippet.Thumbnails.Medium.Width)
-			ytVideo.Thumbnails.Medium.Height = int(video.Snippet.Thumbnails.Medium.Height)
+		if thumbs.Medium != nil {
+			ytVideo.Thumbnails.Medium.URL = thumbs.Medium.Url
+			ytVideo.Thumbnails.Medium.Width = int(thumbs.Medium.Width)
+			ytVideo.Thumbnails.Medium.Height = int(thumbs.Medium.Height)
 		}
-		if video.Snippet.Thumbnails.High != nil {
-			ytVideo.Thumbnails.High.URL = video.Snippet.Thumbnails.High.Url
-			ytVideo.Thumbnails.High.Width = int(video.Snippet.Thumbnails.High.Width)
-			ytVideo.Thumbnails.High.Height = int(video.Snippet.Thumbnails.High.Height)
+		if thumbs.High != nil {
+			ytVideo.Thumbnails.High.URL = thumbs.High.Url
+			ytVideo.Thumbnails.High.Width = int(thumbs.High.Width)
+			ytVideo.Thumbnails.High.Height = int(thumbs.High.Height)
 		}
 	}
 
@@ -386,6 +424,11 @@ func (c *Client) UpdateVideo(ctx context.Context, videoID string, updates map[st
 	}
 
 	// Fetch existing video to preserve unchanged fields
+	logger.GetLogger().WithFields(map[string]interface{}{
+		"video_id":    videoID,
+		"update_keys": fmt.Sprintf("%v", keys(updates)),
+	}).Info("YouTube UpdateVideo: fetching existing video")
+
 	existingResp, err := c.service.Videos.List([]string{"snippet", "status"}).Id(videoID).Do()
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch existing video: %w", err)
@@ -394,6 +437,16 @@ func (c *Client) UpdateVideo(ctx context.Context, videoID string, updates map[st
 		return nil, fmt.Errorf("video not found: %s", videoID)
 	}
 	existing := existingResp.Items[0]
+
+	// Ownership check (if channel IDs known)
+	if existing.Snippet != nil && existing.Snippet.ChannelId != "" && c.channelID != "" && existing.Snippet.ChannelId != c.channelID {
+		logger.GetLogger().WithFields(map[string]interface{}{
+			"video_channel_id":      existing.Snippet.ChannelId,
+			"authenticated_channel": c.channelID,
+			"video_id":              videoID,
+		}).Warn("YouTube UpdateVideo denied: channel mismatch")
+		return nil, fmt.Errorf("cannot update video: authenticated channel (%s) does not own video (%s)", c.channelID, existing.Snippet.ChannelId)
+	}
 
 	// Apply updates
 	if title, ok := updates["title"].(string); ok {
@@ -416,8 +469,39 @@ func (c *Client) UpdateVideo(ctx context.Context, videoID string, updates map[st
 	}
 
 	// Perform update call (videos.update requires both snippet & status parts when modifying those fields)
+	logger.GetLogger().WithFields(map[string]interface{}{
+		"video_id":        videoID,
+		"applied_updates": updates,
+	}).Info("YouTube UpdateVideo: performing update")
 	updatedResp, err := c.service.Videos.Update([]string{"snippet", "status"}, existing).Do()
 	if err != nil {
+		// Unwrap googleapi error for better diagnostics
+		var gErr *googleapi.Error
+		if errors.As(err, &gErr) {
+			// Build guidance
+			guidance := ""
+			reasons := []string{}
+			for _, e := range gErr.Errors {
+				if e.Reason != "" {
+					reasons = append(reasons, e.Reason)
+				}
+			}
+			switch gErr.Code {
+			case 401:
+				guidance = "Token unauthorized or expired. Re-run /auth/youtube to refresh OAuth credentials."
+			case 403:
+				guidance = "Forbidden: Ensure the OAuth consent granted includes youtube.upload scope and that the authenticated account owns the video. Re-run /auth/youtube and accept requested scopes."
+			default:
+				guidance = "Check OAuth scopes and video ownership."
+			}
+			logger.GetLogger().WithFields(map[string]interface{}{
+				"video_id": videoID,
+				"code":     gErr.Code,
+				"message":  gErr.Message,
+				"reasons":  reasons,
+			}).Error("YouTube update failed")
+			return nil, fmt.Errorf("failed to update video (code %d): %s | reasons: %v | guidance: %s", gErr.Code, gErr.Message, reasons, guidance)
+		}
 		return nil, fmt.Errorf("failed to update video: %w", err)
 	}
 
