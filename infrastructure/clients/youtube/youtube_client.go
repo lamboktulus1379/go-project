@@ -34,11 +34,28 @@ type Config struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 	ChannelID    string `json:"channel_id"`
+	APIKey       string `json:"api_key"`
 }
 
 // NewYouTubeClient creates a new YouTube API client
 func NewYouTubeClient(ctx context.Context, config *Config) (repository.IYouTube, error) {
-	// OAuth2 configuration
+	// If we don't have OAuth credentials but we do have an API key, use API key only mode (read-only)
+	if (config.AccessToken == "" || config.RefreshToken == "") && config.APIKey != "" {
+		service, err := youtube.NewService(ctx, option.WithAPIKey(config.APIKey))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create YouTube service with API key: %w", err)
+		}
+		return &Client{
+			service:     service,
+			channelID:   config.ChannelID,
+			accessToken: "", // no bearer token
+			oauthConfig: nil,
+			token:       nil,
+			ctx:         ctx,
+		}, nil
+	}
+
+	// Full OAuth2 mode
 	oauth2Config := &oauth2.Config{
 		ClientID:     config.ClientID,
 		ClientSecret: config.ClientSecret,
@@ -51,7 +68,6 @@ func NewYouTubeClient(ctx context.Context, config *Config) (repository.IYouTube,
 		Endpoint: google.Endpoint,
 	}
 
-	// Create token with expiry time for automatic refresh
 	token := &oauth2.Token{
 		AccessToken:  config.AccessToken,
 		RefreshToken: config.RefreshToken,
@@ -59,10 +75,7 @@ func NewYouTubeClient(ctx context.Context, config *Config) (repository.IYouTube,
 		Expiry:       time.Now().Add(-1 * time.Minute), // Force refresh on first use
 	}
 
-	// Create HTTP client with OAuth2 that will auto-refresh tokens
 	httpClient := oauth2Config.Client(ctx, token)
-
-	// Create YouTube service
 	service, err := youtube.NewService(ctx, option.WithHTTPClient(httpClient))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create YouTube service: %w", err)
@@ -80,14 +93,30 @@ func NewYouTubeClient(ctx context.Context, config *Config) (repository.IYouTube,
 
 // GetMyVideos retrieves videos from the authenticated user's channel
 func (c *Client) GetMyVideos(ctx context.Context, req *dto.YouTubeVideoListRequest) (*dto.YouTubeVideoResponse, error) {
-	// Refresh token if needed before making API calls
-	if err := c.refreshTokenIfNeeded(); err != nil {
-		return nil, fmt.Errorf("failed to refresh token: %w", err)
+	// If no OAuth (API key mode) skip refresh
+	if c.oauthConfig != nil && c.token != nil {
+		if err := c.refreshTokenIfNeeded(); err != nil {
+			return nil, fmt.Errorf("failed to refresh token: %w", err)
+		}
 	}
 
+	// Fallback mock data when channel ID not set
 	channelID := c.channelID
 	if req.ChannelID != "" {
 		channelID = req.ChannelID
+	}
+	if channelID == "" {
+		mock := &dto.YouTubeVideoResponse{
+			YouTubeResponse: dto.YouTubeResponse{
+				Kind:     "youtube#searchListResponse",
+				PageInfo: dto.PageInfo{TotalResults: 2, ResultsPerPage: 2},
+			},
+			Items: []interface{}{
+				map[string]interface{}{"id": "mock-video-1", "title": "Configure YOUTUBE_CHANNEL_ID", "description": "Set YOUTUBE_CHANNEL_ID env or add to config.json", "view_count": 0, "like_count": 0},
+				map[string]interface{}{"id": "mock-video-2", "title": "Using API Key mode", "description": "Provide access & refresh token for authenticated channel data", "view_count": 0, "like_count": 0},
+			},
+		}
+		return mock, nil
 	}
 
 	call := c.service.Search.List([]string{"id", "snippet"}).
@@ -98,27 +127,22 @@ func (c *Client) GetMyVideos(ctx context.Context, req *dto.YouTubeVideoListReque
 	if req.MaxResults > 0 {
 		call = call.MaxResults(req.MaxResults)
 	} else {
-		call = call.MaxResults(25) // Default
+		call = call.MaxResults(25)
 	}
-
 	if req.PageToken != "" {
 		call = call.PageToken(req.PageToken)
 	}
-
 	if req.Order != "" {
 		call = call.Order(req.Order)
 	}
-
 	if req.Q != "" {
 		call = call.Q(req.Q)
 	}
-
 	if req.PublishedAfter != "" {
 		if publishedAfter, err := time.Parse(time.RFC3339, req.PublishedAfter); err == nil {
 			call = call.PublishedAfter(publishedAfter.Format(time.RFC3339))
 		}
 	}
-
 	if req.PublishedBefore != "" {
 		if publishedBefore, err := time.Parse(time.RFC3339, req.PublishedBefore); err == nil {
 			call = call.PublishedBefore(publishedBefore.Format(time.RFC3339))
@@ -130,21 +154,17 @@ func (c *Client) GetMyVideos(ctx context.Context, req *dto.YouTubeVideoListReque
 		return nil, fmt.Errorf("failed to get videos: %w", err)
 	}
 
-	// Get video IDs for additional details
 	var videoIDs []string
 	for _, item := range response.Items {
 		videoIDs = append(videoIDs, item.Id.VideoId)
 	}
 
-	// Get video statistics and content details
 	videos := make([]interface{}, 0)
 	if len(videoIDs) > 0 {
-		videoDetails, err := c.service.Videos.List([]string{"snippet", "statistics", "contentDetails", "status"}).
-			Id(strings.Join(videoIDs, ",")).Do()
+		videoDetails, err := c.service.Videos.List([]string{"snippet", "statistics", "contentDetails", "status"}).Id(strings.Join(videoIDs, ",")).Do()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get video details: %w", err)
 		}
-
 		for _, video := range videoDetails.Items {
 			ytVideo := c.convertToYouTubeVideo(video)
 			videos = append(videos, ytVideo)
@@ -157,10 +177,7 @@ func (c *Client) GetMyVideos(ctx context.Context, req *dto.YouTubeVideoListReque
 			ETag:          response.Etag,
 			NextPageToken: response.NextPageToken,
 			PrevPageToken: response.PrevPageToken,
-			PageInfo: dto.PageInfo{
-				TotalResults:   response.PageInfo.TotalResults,
-				ResultsPerPage: response.PageInfo.ResultsPerPage,
-			},
+			PageInfo:      dto.PageInfo{TotalResults: response.PageInfo.TotalResults, ResultsPerPage: response.PageInfo.ResultsPerPage},
 		},
 		Items: videos,
 	}, nil
@@ -501,27 +518,23 @@ func (c *Client) GetVideoAnalytics(ctx context.Context, videoID string, startDat
 
 // refreshTokenIfNeeded checks if the token is expired and refreshes it automatically
 func (c *Client) refreshTokenIfNeeded() error {
-	// Check if token is expired or about to expire (within 5 minutes)
+	// In API key mode (no oauthConfig/token) nothing to do
+	if c.oauthConfig == nil || c.token == nil {
+		return nil
+	}
 	if c.token.Expiry.IsZero() || time.Until(c.token.Expiry) < 5*time.Minute {
-		// Use the oauth2 client to refresh the token automatically
 		newToken, err := c.oauthConfig.TokenSource(c.ctx, c.token).Token()
 		if err != nil {
 			return fmt.Errorf("failed to refresh token: %w", err)
 		}
-		
-		// Update the stored token
 		c.token = newToken
 		c.accessToken = newToken.AccessToken
-		
-		// Recreate the YouTube service with the new token
 		httpClient := c.oauthConfig.Client(c.ctx, newToken)
 		service, err := youtube.NewService(c.ctx, option.WithHTTPClient(httpClient))
 		if err != nil {
 			return fmt.Errorf("failed to recreate YouTube service with refreshed token: %w", err)
 		}
 		c.service = service
-		
-		// Log the token refresh (optional)
 		fmt.Printf("Token refreshed successfully. New expiry: %v\n", newToken.Expiry)
 	}
 	return nil

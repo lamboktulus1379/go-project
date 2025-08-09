@@ -55,33 +55,53 @@ func NewYouTubeHandler(youtubeUseCase usecase.IYouTubeUseCase) IYouTubeHandler {
 func (h *YouTubeHandler) GetMyVideos(ctx *gin.Context) {
 	req := &dto.YouTubeVideoListRequest{}
 
-	// Parse query parameters
-	if maxResults := ctx.Query("max_results"); maxResults != "" {
-		if val, err := strconv.ParseInt(maxResults, 10, 64); err == nil {
+	// Support both snake_case and camelCase query params from frontend
+	maxResultsRaw := ctx.Query("max_results")
+	if maxResultsRaw == "" {
+		maxResultsRaw = ctx.Query("maxResults")
+	}
+	if maxResultsRaw != "" {
+		if val, err := strconv.ParseInt(maxResultsRaw, 10, 64); err == nil {
 			req.MaxResults = val
 		}
 	}
-
-	req.PageToken = ctx.Query("page_token")
+	pageToken := ctx.Query("page_token")
+	if pageToken == "" {
+		pageToken = ctx.Query("pageToken")
+	}
+	req.PageToken = pageToken
 	req.Order = ctx.Query("order")
 	req.Q = ctx.Query("q")
-	req.PublishedAfter = ctx.Query("published_after")
-	req.PublishedBefore = ctx.Query("published_before")
-	req.ChannelID = ctx.Query("channel_id")
+	publishedAfter := ctx.Query("published_after")
+	if publishedAfter == "" {
+		publishedAfter = ctx.Query("publishedAfter")
+	}
+	req.PublishedAfter = publishedAfter
+	publishedBefore := ctx.Query("published_before")
+	if publishedBefore == "" {
+		publishedBefore = ctx.Query("publishedBefore")
+	}
+	req.PublishedBefore = publishedBefore
+	channelID := ctx.Query("channel_id")
+	if channelID == "" {
+		channelID = ctx.Query("channelId")
+	}
+	req.ChannelID = channelID
 
 	response, err := h.youtubeUseCase.GetMyVideos(ctx.Request.Context(), req)
 	if err != nil {
+		// Provide fallback mock data so FE can still render something and display error
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to get videos",
 			"message": err.Error(),
+			"data": []gin.H{
+				{"id": "mock-error-1", "title": "YouTube fetch failed", "description": err.Error()},
+			},
 		})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    response,
-	})
+	ctx.JSON(http.StatusOK, gin.H{"success": true, "data": response})
 }
 
 // GetVideoDetails handles GET /api/youtube/videos/:videoId
