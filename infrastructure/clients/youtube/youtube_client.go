@@ -409,7 +409,9 @@ func (c *Client) UpdateVideo(ctx context.Context, videoID string, updates map[st
 		existing.Snippet.CategoryId = cat
 	}
 	if privacy, ok := updates["privacy"].(string); ok {
-		if existing.Status == nil { existing.Status = &youtube.VideoStatus{} }
+		if existing.Status == nil {
+			existing.Status = &youtube.VideoStatus{}
+		}
 		existing.Status.PrivacyStatus = privacy
 	}
 

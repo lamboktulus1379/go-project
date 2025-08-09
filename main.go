@@ -125,6 +125,18 @@ func main() {
 		// Continue without YouTube functionality
 	}
 
+	if youtubeConfig != nil {
+		logger.GetLogger().WithFields(map[string]interface{}{
+			"hasAccessToken":  youtubeConfig.AccessToken != "" && youtubeConfig.AccessToken != "your_access_token_here",
+			"hasRefreshToken": youtubeConfig.RefreshToken != "" && youtubeConfig.RefreshToken != "your_refresh_token_here",
+			"hasAPIKey":       youtubeConfig.APIKey != "" && youtubeConfig.APIKey != "YOUR_YOUTUBE_API_KEY",
+			"channelIDSet":    youtubeConfig.ChannelID != "",
+			"clientIDSet":     youtubeConfig.ClientID != "" && youtubeConfig.ClientID != "your_client_id_here",
+		}).Info("Loaded YouTube configuration state")
+	} else {
+		logger.GetLogger().Info("YouTube configuration struct is nil (no config file loaded)")
+	}
+
 	var youtubeHandler httpHandler.IYouTubeHandler
 	var youtubeAuthHandler httpHandler.IYouTubeAuthHandler
 
@@ -140,6 +152,8 @@ func main() {
 		((youtubeConfig.AccessToken != "" && youtubeConfig.AccessToken != "your_access_token_here") ||
 			(youtubeConfig.APIKey != "" && youtubeConfig.APIKey != "YOUR_YOUTUBE_API_KEY")) {
 
+		logger.GetLogger().Info("Attempting to initialize YouTube client (tokens or API key present)")
+
 		// Convert configuration to YouTube client config
 		youtubeClientConfig := &youtubeclient.Config{
 			ClientID:     youtubeConfig.ClientID,
@@ -148,6 +162,7 @@ func main() {
 			AccessToken:  youtubeConfig.AccessToken,
 			RefreshToken: youtubeConfig.RefreshToken,
 			ChannelID:    youtubeConfig.ChannelID,
+			APIKey:       youtubeConfig.APIKey,
 		}
 
 		// Initialize YouTube client
@@ -158,10 +173,10 @@ func main() {
 			// Initialize YouTube use case and handler
 			youtubeUsecase := usecase.NewYouTubeUseCase(youtubeClient)
 			youtubeHandler = httpHandler.NewYouTubeHandler(youtubeUsecase)
-			logger.GetLogger().Info("YouTube API client initialized successfully")
+			logger.GetLogger().Info("YouTube API client initialized successfully; registering YouTube routes including PATCH /api/youtube/videos/:videoId")
 		}
 	} else {
-		logger.GetLogger().Info("YouTube API credentials not configured - YouTube features will be disabled (using mock data)")
+		logger.GetLogger().Info("YouTube API credentials not configured - YouTube features will be disabled (using mock data only; PATCH route will return 501 fallback)")
 	}
 
 	userHandler := httpHandler.NewUserHandler(userUsecase)
