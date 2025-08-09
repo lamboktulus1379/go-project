@@ -419,6 +419,12 @@ Update CORS settings in `/server/router.go` for your frontend domain.
    go run main.go
    ```
 
+2. Or start with hot reload (Air):
+  ```bash
+  ./start-air.sh
+  ```
+  This uses the existing `.air.toml` configuration. If Air isn't installed the script installs it (requires Go) or falls back to `go run`.
+
 2. The API will be available at: `http://localhost:10001`
 
 ### Production Mode

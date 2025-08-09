@@ -242,10 +242,11 @@ func (c *Client) convertToYouTubeVideo(video *youtube.Video) model.YouTubeVideo 
 		status = video.Status.PrivacyStatus
 	}
 
-	var viewCount, likeCount int64
+	var viewCount, likeCount, commentCount int64
 	if video.Statistics != nil {
 		viewCount = int64(video.Statistics.ViewCount)
 		likeCount = int64(video.Statistics.LikeCount)
+		commentCount = int64(video.Statistics.CommentCount)
 	}
 
 	ytVideo := model.YouTubeVideo{
@@ -255,8 +256,9 @@ func (c *Client) convertToYouTubeVideo(video *youtube.Video) model.YouTubeVideo 
 		PublishedAt: publishedAt,
 		ChannelID:   channelID,
 		ChannelName: channelTitle,
-		ViewCount:   viewCount,
-		LikeCount:   likeCount,
+		ViewCount:    viewCount,
+		LikeCount:    likeCount,
+		CommentCount: commentCount,
 		Duration:    duration,
 		Tags:        tags,
 		Status:      status,
@@ -515,23 +517,205 @@ func (c *Client) DeleteVideo(ctx context.Context, videoID string) error {
 }
 
 func (c *Client) GetVideoComments(ctx context.Context, req *dto.YouTubeCommentListRequest) (*dto.YouTubeCommentResponse, error) {
-	// Implementation for getting video comments
-	return nil, fmt.Errorf("not implemented yet")
+	// Read-only mode with API key only cannot access comments.list for mine? It can list public comments though.
+	// Attempt anyway; if in pure API key mode (no oauthConfig/token) the YouTube Data API will still return public comments.
+	if req == nil || req.VideoID == "" {
+		return nil, fmt.Errorf("video ID is required")
+	}
+
+	if c.oauthConfig != nil && c.token != nil {
+		if err := c.refreshTokenIfNeeded(); err != nil {
+			return nil, fmt.Errorf("failed to refresh token: %w", err)
+		}
+	}
+
+	// Default max results
+	max := req.MaxResults
+	if max <= 0 || max > 100 {
+		max = 20
+	}
+
+	// Order: time | relevance
+	order := req.Order
+	if order == "" {
+		order = "time"
+	}
+
+	call := c.service.CommentThreads.List([]string{"snippet", "replies"}).VideoId(req.VideoID).MaxResults(max).Order(order)
+	if req.PageToken != "" {
+		call = call.PageToken(req.PageToken)
+	}
+
+	resp, err := call.Do()
+	if err != nil {
+		var gErr *googleapi.Error
+		if errors.As(err, &gErr) {
+			return nil, fmt.Errorf("failed to get comments (code %d): %s", gErr.Code, gErr.Message)
+		}
+		return nil, fmt.Errorf("failed to get comments: %w", err)
+	}
+
+	comments := make([]interface{}, 0, len(resp.Items))
+	for _, item := range resp.Items {
+		if item == nil || item.Snippet == nil || item.Snippet.TopLevelComment == nil || item.Snippet.TopLevelComment.Snippet == nil {
+			continue
+		}
+		cmt := c.convertThreadToCommentModel(item)
+		comments = append(comments, cmt)
+		// Include replies (flatten) if present
+		if item.Replies != nil {
+			for _, r := range item.Replies.Comments {
+				if r == nil || r.Snippet == nil {
+					continue
+				}
+				replyModel := model.YouTubeComment{
+					ID:                r.Id,
+					VideoID:           req.VideoID,
+					AuthorDisplayName: r.Snippet.AuthorDisplayName,
+					AuthorChannelID:   r.Snippet.AuthorChannelId.Value,
+					Text:              r.Snippet.TextDisplay,
+					LikeCount:         int64(r.Snippet.LikeCount),
+					PublishedAt:       parseTime(r.Snippet.PublishedAt),
+					UpdatedAt:         parseTime(r.Snippet.UpdatedAt),
+					ParentID:          item.Snippet.TopLevelComment.Id,
+					ReplyCount:        0,
+				}
+				comments = append(comments, replyModel)
+			}
+		}
+	}
+
+	out := &dto.YouTubeCommentResponse{
+		YouTubeResponse: dto.YouTubeResponse{
+			Kind:          resp.Kind,
+			ETag:          resp.Etag,
+			NextPageToken: resp.NextPageToken,
+			PrevPageToken: "", // Not provided by commentThreads.list
+			PageInfo: dto.PageInfo{
+				TotalResults:   int64(resp.PageInfo.TotalResults),
+				ResultsPerPage: int64(resp.PageInfo.ResultsPerPage),
+			},
+		},
+		Items: comments,
+	}
+	return out, nil
 }
 
 func (c *Client) AddComment(ctx context.Context, req *dto.YouTubeCommentRequest) (*model.YouTubeComment, error) {
-	// Implementation for adding comment
-	return nil, fmt.Errorf("not implemented yet")
+	if req == nil || req.VideoID == "" || req.Text == "" {
+		return nil, fmt.Errorf("video ID and text are required")
+	}
+	// Must have OAuth to write comments
+	if c.oauthConfig == nil || c.token == nil {
+		return nil, fmt.Errorf("comment creation requires OAuth credentials (access & refresh token)")
+	}
+	if err := c.refreshTokenIfNeeded(); err != nil {
+		return nil, fmt.Errorf("failed to refresh token: %w", err)
+	}
+
+	if req.ParentID != "" {
+		// This is a reply -> use comments.insert with parentId
+		comment := &youtube.Comment{
+			Snippet: &youtube.CommentSnippet{
+				TextOriginal: req.Text,
+				ParentId:     req.ParentID,
+			},
+		}
+		insertCall := c.service.Comments.Insert([]string{"snippet"}, comment)
+		created, err := insertCall.Do()
+		if err != nil {
+			return nil, fmt.Errorf("failed to add reply: %w", err)
+		}
+		modelComment := &model.YouTubeComment{
+			ID:                created.Id,
+			VideoID:           req.VideoID,
+			AuthorDisplayName: created.Snippet.AuthorDisplayName,
+			AuthorChannelID:   created.Snippet.AuthorChannelId.Value,
+			Text:              created.Snippet.TextDisplay,
+			LikeCount:         int64(created.Snippet.LikeCount),
+			PublishedAt:       parseTime(created.Snippet.PublishedAt),
+			UpdatedAt:         parseTime(created.Snippet.UpdatedAt),
+			ParentID:          req.ParentID,
+			ReplyCount:        0,
+		}
+		return modelComment, nil
+	}
+
+	thread := &youtube.CommentThread{
+		Snippet: &youtube.CommentThreadSnippet{
+			VideoId: req.VideoID,
+			TopLevelComment: &youtube.Comment{
+				Snippet: &youtube.CommentSnippet{
+					TextOriginal: req.Text,
+				},
+			},
+		},
+	}
+	call := c.service.CommentThreads.Insert([]string{"snippet"}, thread)
+	created, err := call.Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to add comment: %w", err)
+	}
+
+	modelComment := c.convertThreadToCommentModel(created)
+	return &modelComment, nil
 }
 
 func (c *Client) UpdateComment(ctx context.Context, req *dto.YouTubeCommentUpdateRequest) (*model.YouTubeComment, error) {
-	// Implementation for updating comment
-	return nil, fmt.Errorf("not implemented yet")
+	if req == nil || req.CommentID == "" || req.Text == "" {
+		return nil, fmt.Errorf("comment ID and text are required")
+	}
+	if c.oauthConfig == nil || c.token == nil {
+		return nil, fmt.Errorf("comment update requires OAuth credentials")
+	}
+	if err := c.refreshTokenIfNeeded(); err != nil {
+		return nil, fmt.Errorf("failed to refresh token: %w", err)
+	}
+
+	// Need to retrieve existing comment first because update requires full resource
+	getCall := c.service.Comments.List([]string{"snippet"}).Id(req.CommentID)
+	listResp, err := getCall.Do()
+	if err != nil || len(listResp.Items) == 0 {
+		return nil, fmt.Errorf("failed to fetch existing comment for update: %w", err)
+	}
+	orig := listResp.Items[0]
+	orig.Snippet.TextOriginal = req.Text
+
+	updateCall := c.service.Comments.Update([]string{"snippet"}, orig)
+	updated, err := updateCall.Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to update comment: %w", err)
+	}
+	modelComment := &model.YouTubeComment{
+		ID:                updated.Id,
+		VideoID:           updated.Snippet.VideoId,
+		AuthorDisplayName: updated.Snippet.AuthorDisplayName,
+		AuthorChannelID:   updated.Snippet.AuthorChannelId.Value,
+		Text:              updated.Snippet.TextDisplay,
+		LikeCount:         int64(updated.Snippet.LikeCount),
+		PublishedAt:       parseTime(updated.Snippet.PublishedAt),
+		UpdatedAt:         parseTime(updated.Snippet.UpdatedAt),
+		ParentID:          updated.Snippet.ParentId,
+		ReplyCount:        0,
+	}
+	return modelComment, nil
 }
 
 func (c *Client) DeleteComment(ctx context.Context, commentID string) error {
-	// Implementation for deleting comment
-	return fmt.Errorf("not implemented yet")
+	if commentID == "" {
+		return fmt.Errorf("comment ID is required")
+	}
+	if c.oauthConfig == nil || c.token == nil {
+		return fmt.Errorf("comment deletion requires OAuth credentials")
+	}
+	if err := c.refreshTokenIfNeeded(); err != nil {
+		return fmt.Errorf("failed to refresh token: %w", err)
+	}
+	call := c.service.Comments.Delete(commentID)
+	if err := call.Do(); err != nil {
+		return fmt.Errorf("failed to delete comment: %w", err)
+	}
+	return nil
 }
 
 func (c *Client) LikeVideo(ctx context.Context, videoID string) error {
@@ -550,18 +734,43 @@ func (c *Client) RemoveVideoRating(ctx context.Context, videoID string) error {
 }
 
 func (c *Client) LikeComment(ctx context.Context, commentID string) error {
-	// Implementation for liking comment
-	return fmt.Errorf("not implemented yet")
+	// The YouTube Data API v3 does not expose an endpoint to like a comment programmatically.
+	return fmt.Errorf("liking comments is not supported by YouTube Data API v3")
 }
 
 func (c *Client) DislikeComment(ctx context.Context, commentID string) error {
-	// Implementation for disliking comment
-	return fmt.Errorf("not implemented yet")
+	return fmt.Errorf("disliking comments is not supported by YouTube Data API v3")
 }
 
 func (c *Client) RemoveCommentRating(ctx context.Context, commentID string) error {
-	// Implementation for removing comment rating
-	return fmt.Errorf("not implemented yet")
+	return fmt.Errorf("removing comment rating is not supported by YouTube Data API v3")
+}
+
+// convertThreadToCommentModel converts a CommentThread to our model (top-level comment only)
+func (c *Client) convertThreadToCommentModel(th *youtube.CommentThread) model.YouTubeComment {
+	var out model.YouTubeComment
+	if th == nil || th.Snippet == nil || th.Snippet.TopLevelComment == nil || th.Snippet.TopLevelComment.Snippet == nil {
+		return out
+	}
+	sn := th.Snippet.TopLevelComment.Snippet
+	out = model.YouTubeComment{
+		ID:                th.Snippet.TopLevelComment.Id,
+		VideoID:           th.Snippet.VideoId,
+		AuthorDisplayName: sn.AuthorDisplayName,
+		AuthorChannelID:   sn.AuthorChannelId.Value,
+		Text:              sn.TextDisplay,
+		LikeCount:         int64(sn.LikeCount),
+		PublishedAt:       parseTime(sn.PublishedAt),
+		UpdatedAt:         parseTime(sn.UpdatedAt),
+		ReplyCount:        int64(th.Snippet.TotalReplyCount),
+	}
+	return out
+}
+
+// parseTime safely parses RFC3339 time returning zero time on failure
+func parseTime(v string) time.Time {
+	t, _ := time.Parse(time.RFC3339, v)
+	return t
 }
 
 func (c *Client) GetMyChannel(ctx context.Context) (*model.YouTubeChannel, error) {

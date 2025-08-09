@@ -12,6 +12,7 @@ type YouTubeVideo struct {
 	ChannelName string    `json:"channel_name"`
 	ViewCount   int64     `json:"view_count"`
 	LikeCount   int64     `json:"like_count"`
+	CommentCount int64    `json:"comment_count"`
 	Duration    string    `json:"duration"`
 	Thumbnails  struct {
 		Default struct {
