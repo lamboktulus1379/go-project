@@ -1,6 +1,7 @@
 package configuration
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"strings"
@@ -27,6 +28,24 @@ func GetYouTubeConfig() (*YouTubeConfig, error) {
 		RefreshToken: getEnv("YOUTUBE_REFRESH_TOKEN", ""),
 		ChannelID:    getEnv("YOUTUBE_CHANNEL_ID", ""),
 		APIKey:       getConfigValue(C.YouTube.APIKey, "YOUTUBE_API_KEY", ""),
+	}
+
+	// Fallback: if access/refresh tokens are empty, attempt to read token.json produced by OAuth callback
+	if config.AccessToken == "" || config.RefreshToken == "" {
+		if data, err := os.ReadFile("token.json"); err == nil {
+			var tokenFile struct {
+				AccessToken  string `json:"access_token"`
+				RefreshToken string `json:"refresh_token"`
+			}
+			if jsonErr := json.Unmarshal(data, &tokenFile); jsonErr == nil {
+				if config.AccessToken == "" && tokenFile.AccessToken != "" {
+					config.AccessToken = tokenFile.AccessToken
+				}
+				if config.RefreshToken == "" && tokenFile.RefreshToken != "" {
+					config.RefreshToken = tokenFile.RefreshToken
+				}
+			}
+		}
 	}
 
 	// Validate required fields
