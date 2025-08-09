@@ -187,12 +187,15 @@ func main() {
 	oauthRepo := persistence.NewOAuthTokenRepository(mysqlDb)
 	var shareHandler httpHandler.IShareHandler
 	if len(configuration.C.Share.Platforms) == 0 {
-		configuration.C.Share.Platforms = []string{"twitter","facebook","whatsapp"}
+		configuration.C.Share.Platforms = []string{"twitter", "facebook", "whatsapp"}
 	}
 	shareUsecase := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms)
 	shareHandler = httpHandler.NewShareHandler(shareUsecase, configuration.C.Share.Platforms)
 
-	router := server.InitiateRouter(userHandler, testHandler, youtubeHandler, youtubeAuthHandler, userRepository, shareHandler)
+	// Facebook OAuth handler (uses same oauth token repo)
+	facebookOAuthHandler := httpHandler.NewFacebookOAuthHandler(oauthRepo)
+
+	router := server.InitiateRouter(userHandler, testHandler, youtubeHandler, youtubeAuthHandler, userRepository, shareHandler, facebookOAuthHandler)
 
 	// Background share job processor (simple ticker loop)
 	if shareHandler != nil {

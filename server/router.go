@@ -19,6 +19,7 @@ func InitiateRouter(
 	youtubeAuthHandler httpHandler.IYouTubeAuthHandler,
 	userRepository repository.IUser,
 	shareHandler httpHandler.IShareHandler,
+	facebookOAuthHandler httpHandler.IFacebookOAuthHandler,
 ) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
@@ -40,10 +41,14 @@ func InitiateRouter(
 	router.POST("/login", userHandler.Login)
 	router.POST("/register", userHandler.Register)
 
-	// YouTube OAuth2 authentication routes (only if handler is available)
+	// OAuth authentication routes
 	if youtubeAuthHandler != nil {
 		router.GET("/auth/youtube", youtubeAuthHandler.GetAuthURL)
 		router.GET("/auth/youtube/callback", youtubeAuthHandler.HandleCallback)
+	}
+	if facebookOAuthHandler != nil {
+		router.GET("/auth/facebook", facebookOAuthHandler.GetAuthURL)
+		router.GET("/auth/facebook/callback", facebookOAuthHandler.Callback)
 	}
 
 	// Temporary test route for YouTube API (bypasses authentication)
@@ -129,8 +134,20 @@ func InitiateRouter(
 			youtube.GET("/playlists", youtubeHandler.GetMyPlaylists)
 			youtube.POST("/playlists", youtubeHandler.CreatePlaylist)
 			// Share endpoints (video social sharing)
-			youtube.POST("/videos/:videoId/share", func(c *gin.Context) { if shareHandler!=nil { shareHandler.ShareVideo(c); return }; c.JSON(http.StatusNotImplemented, gin.H{"error":"share handler not configured"}) })
-			youtube.GET("/videos/:videoId/share-status", func(c *gin.Context) { if shareHandler!=nil { shareHandler.GetShareStatus(c); return }; c.JSON(http.StatusNotImplemented, gin.H{"error":"share handler not configured"}) })
+			youtube.POST("/videos/:videoId/share", func(c *gin.Context) {
+				if shareHandler != nil {
+					shareHandler.ShareVideo(c)
+					return
+				}
+				c.JSON(http.StatusNotImplemented, gin.H{"error": "share handler not configured"})
+			})
+			youtube.GET("/videos/:videoId/share-status", func(c *gin.Context) {
+				if shareHandler != nil {
+					shareHandler.GetShareStatus(c)
+					return
+				}
+				c.JSON(http.StatusNotImplemented, gin.H{"error": "share handler not configured"})
+			})
 		}
 	} else {
 		// Add fallback endpoints when YouTube is not configured
