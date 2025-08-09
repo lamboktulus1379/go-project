@@ -174,10 +174,10 @@ func InitiateRouter(
 			// Fallback for update route to avoid 404 and provide clear guidance
 			youtube.PATCH("/videos/:videoId", func(ctx *gin.Context) {
 				ctx.JSON(http.StatusNotImplemented, gin.H{
-					"error":       true,
-					"message":     "Video update not available - YouTube API not fully configured (OAuth credentials required)",
-					"hint":        "Provide access & refresh tokens or complete OAuth flow at /auth/youtube to enable editing",
-					"video_id":    ctx.Param("videoId"),
+					"error":         true,
+					"message":       "Video update not available - YouTube API not fully configured (OAuth credentials required)",
+					"hint":          "Provide access & refresh tokens or complete OAuth flow at /auth/youtube to enable editing",
+					"video_id":      ctx.Param("videoId"),
 					"documentation": "/docs/YOUTUBE_API_SETUP.md",
 				})
 			})
