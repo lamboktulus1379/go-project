@@ -4,17 +4,17 @@ import "time"
 
 // YouTubeVideo represents a YouTube video
 type YouTubeVideo struct {
-	ID          string    `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	PublishedAt time.Time `json:"published_at"`
-	ChannelID   string    `json:"channel_id"`
-	ChannelName string    `json:"channel_name"`
-	ViewCount   int64     `json:"view_count"`
-	LikeCount   int64     `json:"like_count"`
-	CommentCount int64    `json:"comment_count"`
-	Duration    string    `json:"duration"`
-	Thumbnails  struct {
+	ID           string    `json:"id"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	PublishedAt  time.Time `json:"published_at"`
+	ChannelID    string    `json:"channel_id"`
+	ChannelName  string    `json:"channel_name"`
+	ViewCount    int64     `json:"view_count"`
+	LikeCount    int64     `json:"like_count"`
+	CommentCount int64     `json:"comment_count"`
+	Duration     string    `json:"duration"`
+	Thumbnails   struct {
 		Default struct {
 			URL    string `json:"url"`
 			Width  int    `json:"width"`
@@ -48,6 +48,9 @@ type YouTubeComment struct {
 	UpdatedAt         time.Time `json:"updated_at"`
 	ParentID          string    `json:"parent_id,omitempty"` // For replies
 	ReplyCount        int64     `json:"reply_count"`
+	Replies           []YouTubeComment `json:"replies,omitempty"` // Nested replies (direct children)
+	Liked             bool      `json:"liked,omitempty"`  // Whether current user liked (not available in API; app-maintained)
+	Loved             bool      `json:"loved,omitempty"`  // Whether current user hearted (owner heart) (app-maintained)
 }
 
 // YouTubeChannel represents a YouTube channel

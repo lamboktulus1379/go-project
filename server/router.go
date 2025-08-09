@@ -112,7 +112,8 @@ func InitiateRouter(
 			youtube.POST("/comments", youtubeHandler.AddComment)
 			youtube.PUT("/comments/:commentId", youtubeHandler.UpdateComment)
 			youtube.DELETE("/comments/:commentId", youtubeHandler.DeleteComment)
-			youtube.POST("/comments/:commentId/like", youtubeHandler.LikeComment)
+			youtube.POST("/comments/:commentId/like", youtubeHandler.ToggleCommentLike)
+			youtube.POST("/comments/:commentId/heart", youtubeHandler.ToggleCommentHeart)
 
 			// Channel operations
 			youtube.GET("/channel", youtubeHandler.GetMyChannel)

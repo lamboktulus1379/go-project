@@ -27,7 +27,8 @@ type IYouTubeUseCase interface {
 	LikeVideo(ctx context.Context, videoID string) error
 	DislikeVideo(ctx context.Context, videoID string) error
 	RemoveVideoRating(ctx context.Context, videoID string) error
-	LikeComment(ctx context.Context, commentID string) error
+	ToggleCommentLike(ctx context.Context, userID, commentID string) (bool, error)
+	ToggleCommentHeart(ctx context.Context, userID, commentID string) (bool, error)
 
 	// Channel operations
 	GetMyChannel(ctx context.Context) (*model.YouTubeChannel, error)
@@ -340,18 +341,21 @@ func (u *YouTubeUseCase) RemoveVideoRating(ctx context.Context, videoID string) 
 	return nil
 }
 
-// LikeComment likes a comment
-func (u *YouTubeUseCase) LikeComment(ctx context.Context, commentID string) error {
-	if commentID == "" {
-		return fmt.Errorf("comment ID is required")
-	}
 
-	err := u.youtubeRepo.LikeComment(ctx, commentID)
-	if err != nil {
-		return fmt.Errorf("failed to like comment: %w", err)
-	}
+// ToggleCommentLike toggles like state (in-memory) for a user's comment
+func (u *YouTubeUseCase) ToggleCommentLike(ctx context.Context, userID, commentID string) (bool, error) {
+	if userID == "" || commentID == "" { return false, fmt.Errorf("userID and commentID are required") }
+	liked, err := u.youtubeRepo.ToggleUserCommentLike(ctx, userID, commentID)
+	if err != nil { return false, fmt.Errorf("failed to toggle comment like: %w", err) }
+	return liked, nil
+}
 
-	return nil
+// ToggleCommentHeart toggles heart state (in-memory) for a user's comment
+func (u *YouTubeUseCase) ToggleCommentHeart(ctx context.Context, userID, commentID string) (bool, error) {
+	if userID == "" || commentID == "" { return false, fmt.Errorf("userID and commentID are required") }
+	loved, err := u.youtubeRepo.ToggleUserCommentHeart(ctx, userID, commentID)
+	if err != nil { return false, fmt.Errorf("failed to toggle comment heart: %w", err) }
+	return loved, nil
 }
 
 // GetMyChannel retrieves the authenticated user's channel information

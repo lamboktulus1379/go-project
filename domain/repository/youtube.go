@@ -28,9 +28,11 @@ type IYouTube interface {
 	LikeVideo(ctx context.Context, videoID string) error
 	DislikeVideo(ctx context.Context, videoID string) error
 	RemoveVideoRating(ctx context.Context, videoID string) error
-	LikeComment(ctx context.Context, commentID string) error
-	DislikeComment(ctx context.Context, commentID string) error
-	RemoveCommentRating(ctx context.Context, commentID string) error
+	// (Removed unsupported direct comment like/dislike operations – YouTube API lacks endpoints)
+
+	// Local reaction toggles (since YouTube API lacks comment like/heart endpoints)
+	ToggleUserCommentLike(ctx context.Context, userID, commentID string) (bool, error)
+	ToggleUserCommentHeart(ctx context.Context, userID, commentID string) (bool, error)
 
 	// Channel operations
 	GetMyChannel(ctx context.Context) (*model.YouTubeChannel, error)

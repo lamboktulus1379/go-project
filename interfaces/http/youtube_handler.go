@@ -22,6 +22,7 @@ type IYouTubeHandler interface {
 
 	// Comment operations
 	GetVideoComments(ctx *gin.Context)
+	// (Future) GetCommentReplies could provide paginated replies for a given parent comment
 	AddComment(ctx *gin.Context)
 	UpdateComment(ctx *gin.Context)
 	DeleteComment(ctx *gin.Context)
@@ -30,7 +31,8 @@ type IYouTubeHandler interface {
 	LikeVideo(ctx *gin.Context)
 	DislikeVideo(ctx *gin.Context)
 	RemoveVideoRating(ctx *gin.Context)
-	LikeComment(ctx *gin.Context)
+	ToggleCommentLike(ctx *gin.Context)
+	ToggleCommentHeart(ctx *gin.Context)
 
 	// Channel operations
 	GetMyChannel(ctx *gin.Context)
@@ -462,29 +464,44 @@ func (h *YouTubeHandler) RemoveVideoRating(ctx *gin.Context) {
 	})
 }
 
-// LikeComment handles POST /api/youtube/comments/:commentId/like
-func (h *YouTubeHandler) LikeComment(ctx *gin.Context) {
+// ToggleCommentLike handles POST /api/youtube/comments/:commentId/like
+func (h *YouTubeHandler) ToggleCommentLike(ctx *gin.Context) {
 	commentID := ctx.Param("commentId")
 	if commentID == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "Comment ID is required",
-		})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Comment ID is required"})
 		return
 	}
-
-	err := h.youtubeUseCase.LikeComment(ctx.Request.Context(), commentID)
+	userID := ctx.GetString("user_id")
+	if userID == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	liked, err := h.youtubeUseCase.ToggleCommentLike(ctx.Request.Context(), userID, commentID)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to like comment",
-			"message": err.Error(),
-		})
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	ctx.JSON(http.StatusOK, gin.H{"liked": liked})
+}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Comment liked successfully",
-	})
+// ToggleCommentHeart handles POST /api/youtube/comments/:commentId/heart
+func (h *YouTubeHandler) ToggleCommentHeart(ctx *gin.Context) {
+	commentID := ctx.Param("commentId")
+	if commentID == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Comment ID is required"})
+		return
+	}
+	userID := ctx.GetString("user_id")
+	if userID == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	loved, err := h.youtubeUseCase.ToggleCommentHeart(ctx.Request.Context(), userID, commentID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"loved": loved})
 }
 
 // GetMyChannel handles GET /api/youtube/channel
@@ -575,3 +592,5 @@ func (h *YouTubeHandler) CreatePlaylist(ctx *gin.Context) {
 		"data":    playlist,
 	})
 }
+
+// (duplicate toggle handlers removed)

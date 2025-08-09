@@ -27,6 +27,9 @@ type Client struct {
 	oauthConfig *oauth2.Config
 	token       *oauth2.Token
 	ctx         context.Context
+	// in-memory reaction states (userID:commentID)
+	commentLikes map[string]map[string]bool
+	commentHearts map[string]map[string]bool
 }
 
 // keys returns the map's keys as a slice of strings for logging
@@ -64,6 +67,8 @@ func NewYouTubeClient(ctx context.Context, config *Config) (repository.IYouTube,
 			oauthConfig: nil,
 			token:       nil,
 			ctx:         ctx,
+			commentLikes: make(map[string]map[string]bool),
+			commentHearts: make(map[string]map[string]bool),
 		}, nil
 	}
 
@@ -250,19 +255,19 @@ func (c *Client) convertToYouTubeVideo(video *youtube.Video) model.YouTubeVideo 
 	}
 
 	ytVideo := model.YouTubeVideo{
-		ID:          video.Id,
-		Title:       title,
-		Description: description,
-		PublishedAt: publishedAt,
-		ChannelID:   channelID,
-		ChannelName: channelTitle,
+		ID:           video.Id,
+		Title:        title,
+		Description:  description,
+		PublishedAt:  publishedAt,
+		ChannelID:    channelID,
+		ChannelName:  channelTitle,
 		ViewCount:    viewCount,
 		LikeCount:    likeCount,
 		CommentCount: commentCount,
-		Duration:    duration,
-		Tags:        tags,
-		Status:      status,
-		Category:    categoryID,
+		Duration:     duration,
+		Tags:         tags,
+		Status:       status,
+		Category:     categoryID,
 	}
 
 	// Thumbnails (nil-safe)
@@ -561,9 +566,8 @@ func (c *Client) GetVideoComments(ctx context.Context, req *dto.YouTubeCommentLi
 			continue
 		}
 		cmt := c.convertThreadToCommentModel(item)
-		comments = append(comments, cmt)
-		// Include replies (flatten) if present
-		if item.Replies != nil {
+		// Build nested replies slice (instead of flattening) so FE can render threads
+		if item.Replies != nil && len(item.Replies.Comments) > 0 {
 			for _, r := range item.Replies.Comments {
 				if r == nil || r.Snippet == nil {
 					continue
@@ -580,7 +584,17 @@ func (c *Client) GetVideoComments(ctx context.Context, req *dto.YouTubeCommentLi
 					ParentID:          item.Snippet.TopLevelComment.Id,
 					ReplyCount:        0,
 				}
-				comments = append(comments, replyModel)
+				cmt.Replies = append(cmt.Replies, replyModel)
+			}
+		}
+		comments = append(comments, cmt)
+	}
+
+	// Enrich with reaction state if user id context key exists
+	if ctx != nil {
+		if uidVal := ctx.Value("user_id"); uidVal != nil {
+			if uid, ok := uidVal.(string); ok {
+				c.EnrichReactions(uid, comments)
 			}
 		}
 	}
@@ -733,17 +747,16 @@ func (c *Client) RemoveVideoRating(ctx context.Context, videoID string) error {
 	return fmt.Errorf("not implemented yet")
 }
 
-func (c *Client) LikeComment(ctx context.Context, commentID string) error {
-	// The YouTube Data API v3 does not expose an endpoint to like a comment programmatically.
-	return fmt.Errorf("liking comments is not supported by YouTube Data API v3")
+// (Removed unsupported comment like/dislike/rating methods)
+
+// ToggleUserCommentLike implements repository method using in-memory maps
+func (c *Client) ToggleUserCommentLike(ctx context.Context, userID, commentID string) (bool, error) {
+	return c.ToggleCommentLike(userID, commentID), nil
 }
 
-func (c *Client) DislikeComment(ctx context.Context, commentID string) error {
-	return fmt.Errorf("disliking comments is not supported by YouTube Data API v3")
-}
-
-func (c *Client) RemoveCommentRating(ctx context.Context, commentID string) error {
-	return fmt.Errorf("removing comment rating is not supported by YouTube Data API v3")
+// ToggleUserCommentHeart implements repository method using in-memory maps
+func (c *Client) ToggleUserCommentHeart(ctx context.Context, userID, commentID string) (bool, error) {
+	return c.ToggleCommentHeart(userID, commentID), nil
 }
 
 // convertThreadToCommentModel converts a CommentThread to our model (top-level comment only)
@@ -765,6 +778,39 @@ func (c *Client) convertThreadToCommentModel(th *youtube.CommentThread) model.Yo
 		ReplyCount:        int64(th.Snippet.TotalReplyCount),
 	}
 	return out
+}
+
+// ToggleCommentLike toggles like state in memory for a user
+func (c *Client) ToggleCommentLike(userID, commentID string) (liked bool) {
+	if userID == "" || commentID == "" { return false }
+	if c.commentLikes[userID] == nil { c.commentLikes[userID] = make(map[string]bool) }
+	cur := c.commentLikes[userID][commentID]
+	c.commentLikes[userID][commentID] = !cur
+	return !cur
+}
+
+// ToggleCommentHeart toggles heart (love) state in memory for a user (or channel owner)
+func (c *Client) ToggleCommentHeart(userID, commentID string) (hearted bool) {
+	if userID == "" || commentID == "" { return false }
+	if c.commentHearts[userID] == nil { c.commentHearts[userID] = make(map[string]bool) }
+	cur := c.commentHearts[userID][commentID]
+	c.commentHearts[userID][commentID] = !cur
+	return !cur
+}
+
+// EnrichReactions annotates comments with liked/loved flags for a user
+func (c *Client) EnrichReactions(userID string, comments []interface{}) {
+	if userID == "" { return }
+	likes := c.commentLikes[userID]
+	hearts := c.commentHearts[userID]
+	for i, v := range comments {
+		if cm, ok := v.(model.YouTubeComment); ok {
+			if likes != nil && likes[cm.ID] { cm.Liked = true }
+			if hearts != nil && hearts[cm.ID] { cm.Loved = true }
+			// update slice
+			comments[i] = cm
+		}
+	}
 }
 
 // parseTime safely parses RFC3339 time returning zero time on failure
