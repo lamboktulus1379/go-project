@@ -370,8 +370,57 @@ func (c *Client) SearchVideos(ctx context.Context, req *dto.YouTubeSearchRequest
 // You'll need to implement these based on your specific requirements
 
 func (c *Client) UpdateVideo(ctx context.Context, videoID string, updates map[string]interface{}) (*model.YouTubeVideo, error) {
-	// Implementation for updating video metadata
-	return nil, fmt.Errorf("not implemented yet")
+	if videoID == "" {
+		return nil, fmt.Errorf("video ID is required")
+	}
+	if len(updates) == 0 {
+		return nil, fmt.Errorf("no updates provided")
+	}
+
+	// Need OAuth for update; API key mode insufficient
+	if c.oauthConfig == nil || c.token == nil {
+		return nil, fmt.Errorf("video update requires OAuth credentials (access + refresh token)")
+	}
+	if err := c.refreshTokenIfNeeded(); err != nil {
+		return nil, fmt.Errorf("token refresh failed: %w", err)
+	}
+
+	// Fetch existing video to preserve unchanged fields
+	existingResp, err := c.service.Videos.List([]string{"snippet", "status"}).Id(videoID).Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch existing video: %w", err)
+	}
+	if len(existingResp.Items) == 0 {
+		return nil, fmt.Errorf("video not found: %s", videoID)
+	}
+	existing := existingResp.Items[0]
+
+	// Apply updates
+	if title, ok := updates["title"].(string); ok {
+		existing.Snippet.Title = title
+	}
+	if desc, ok := updates["description"].(string); ok {
+		existing.Snippet.Description = desc
+	}
+	if tags, ok := updates["tags"].([]string); ok {
+		existing.Snippet.Tags = tags
+	}
+	if cat, ok := updates["category"].(string); ok {
+		existing.Snippet.CategoryId = cat
+	}
+	if privacy, ok := updates["privacy"].(string); ok {
+		if existing.Status == nil { existing.Status = &youtube.VideoStatus{} }
+		existing.Status.PrivacyStatus = privacy
+	}
+
+	// Perform update call (videos.update requires both snippet & status parts when modifying those fields)
+	updatedResp, err := c.service.Videos.Update([]string{"snippet", "status"}, existing).Do()
+	if err != nil {
+		return nil, fmt.Errorf("failed to update video: %w", err)
+	}
+
+	ytVideo := c.convertToYouTubeVideo(updatedResp)
+	return &ytVideo, nil
 }
 
 func (c *Client) DeleteVideo(ctx context.Context, videoID string) error {

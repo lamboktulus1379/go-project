@@ -99,6 +99,7 @@ func InitiateRouter(
 			youtube.GET("/videos", youtubeHandler.GetMyVideos)
 			youtube.GET("/videos/:videoId", youtubeHandler.GetVideoDetails)
 			youtube.POST("/videos/upload", youtubeHandler.UploadVideo)
+			youtube.PATCH("/videos/:videoId", youtubeHandler.UpdateVideo)
 			youtube.GET("/search", youtubeHandler.SearchVideos)
 
 			// Video rating operations

@@ -14,6 +14,7 @@ type IYouTubeUseCase interface {
 	GetMyVideos(ctx context.Context, req *dto.YouTubeVideoListRequest) (*dto.YouTubeVideoResponse, error)
 	GetVideoDetails(ctx context.Context, videoID string) (*model.YouTubeVideo, error)
 	UploadVideo(ctx context.Context, req *dto.YouTubeVideoUploadRequest) (*model.YouTubeVideo, error)
+	UpdateVideo(ctx context.Context, videoID string, req *dto.YouTubeVideoUpdateRequest) (*model.YouTubeVideo, error)
 	SearchVideos(ctx context.Context, req *dto.YouTubeSearchRequest) (*dto.YouTubeVideoResponse, error)
 
 	// Comment operations
@@ -127,6 +128,48 @@ func (u *YouTubeUseCase) UploadVideo(ctx context.Context, req *dto.YouTubeVideoU
 		return nil, fmt.Errorf("failed to upload video: %w", err)
 	}
 
+	return video, nil
+}
+
+// UpdateVideo updates metadata for an existing video
+func (u *YouTubeUseCase) UpdateVideo(ctx context.Context, videoID string, req *dto.YouTubeVideoUpdateRequest) (*model.YouTubeVideo, error) {
+	if videoID == "" {
+		return nil, fmt.Errorf("video ID is required")
+	}
+	if req == nil {
+		return nil, fmt.Errorf("update request is required")
+	}
+
+	// Build updates map only with provided fields
+	updates := make(map[string]interface{})
+	if req.Title != nil {
+		updates["title"] = *req.Title
+	}
+	if req.Description != nil {
+		updates["description"] = *req.Description
+	}
+	if req.Tags != nil {
+		updates["tags"] = *req.Tags
+	}
+	if req.Privacy != nil {
+		p := *req.Privacy
+		validPrivacySettings := map[string]bool{"private": true, "public": true, "unlisted": true}
+		if !validPrivacySettings[p] {
+			return nil, fmt.Errorf("invalid privacy setting: %s", p)
+		}
+		updates["privacy"] = p
+	}
+	if req.Category != nil {
+		updates["category"] = *req.Category
+	}
+	if len(updates) == 0 {
+		return nil, fmt.Errorf("no fields provided to update")
+	}
+
+	video, err := u.youtubeRepo.UpdateVideo(ctx, videoID, updates)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update video: %w", err)
+	}
 	return video, nil
 }
 

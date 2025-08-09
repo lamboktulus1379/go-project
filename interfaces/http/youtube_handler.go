@@ -16,6 +16,7 @@ type IYouTubeHandler interface {
 	GetMyVideos(ctx *gin.Context)
 	GetVideoDetails(ctx *gin.Context)
 	UploadVideo(ctx *gin.Context)
+	UpdateVideo(ctx *gin.Context)
 	SearchVideos(ctx *gin.Context)
 
 	// Comment operations
@@ -176,6 +177,29 @@ func (h *YouTubeHandler) UploadVideo(ctx *gin.Context) {
 		"success": true,
 		"data":    video,
 	})
+}
+
+// UpdateVideo handles PATCH /api/youtube/videos/:videoId
+func (h *YouTubeHandler) UpdateVideo(ctx *gin.Context) {
+	videoID := ctx.Param("videoId")
+	if videoID == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Video ID is required"})
+		return
+	}
+
+	var req dto.YouTubeVideoUpdateRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	}
+
+	updated, err := h.youtubeUseCase.UpdateVideo(ctx.Request.Context(), videoID, &req)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update video", "message": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"success": true, "data": updated})
 }
 
 // SearchVideos handles GET /api/youtube/search
