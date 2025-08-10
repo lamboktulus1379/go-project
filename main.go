@@ -38,7 +38,7 @@ func recoverPanic() {
 }
 
 func main() {
-	InitiateGoroutine()
+	// InitiateGoroutine()
 	defer recoverPanic()
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)

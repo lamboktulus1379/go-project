@@ -83,7 +83,8 @@ func (u *shareUsecase) Share(ctx context.Context, videoID, userID string, platfo
 	}
 	results := make([]ShareResult, 0, len(records))
 	for _, r := range records {
-		already := r.AttemptCount > 1 && r.Status == "success"
+		// Consider a share already done if status is success (attempt count may not increment on re-calls)
+		already := r.Status == "success" && !force
 		if already && force {
 			// force re-share: reset status to pending and enqueue job if server_post
 			if mode == ShareModeServerPost {
