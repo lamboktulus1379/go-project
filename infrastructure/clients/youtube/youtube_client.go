@@ -28,7 +28,7 @@ type Client struct {
 	token       *oauth2.Token
 	ctx         context.Context
 	// in-memory reaction states (userID:commentID)
-	commentLikes map[string]map[string]bool
+	commentLikes  map[string]map[string]bool
 	commentHearts map[string]map[string]bool
 }
 
@@ -61,13 +61,13 @@ func NewYouTubeClient(ctx context.Context, config *Config) (repository.IYouTube,
 			return nil, fmt.Errorf("failed to create YouTube service with API key: %w", err)
 		}
 		return &Client{
-			service:     service,
-			channelID:   config.ChannelID,
-			accessToken: "", // no bearer token
-			oauthConfig: nil,
-			token:       nil,
-			ctx:         ctx,
-			commentLikes: make(map[string]map[string]bool),
+			service:       service,
+			channelID:     config.ChannelID,
+			accessToken:   "", // no bearer token
+			oauthConfig:   nil,
+			token:         nil,
+			ctx:           ctx,
+			commentLikes:  make(map[string]map[string]bool),
 			commentHearts: make(map[string]map[string]bool),
 		}, nil
 	}
@@ -782,8 +782,12 @@ func (c *Client) convertThreadToCommentModel(th *youtube.CommentThread) model.Yo
 
 // ToggleCommentLike toggles like state in memory for a user
 func (c *Client) ToggleCommentLike(userID, commentID string) (liked bool) {
-	if userID == "" || commentID == "" { return false }
-	if c.commentLikes[userID] == nil { c.commentLikes[userID] = make(map[string]bool) }
+	if userID == "" || commentID == "" {
+		return false
+	}
+	if c.commentLikes[userID] == nil {
+		c.commentLikes[userID] = make(map[string]bool)
+	}
 	cur := c.commentLikes[userID][commentID]
 	c.commentLikes[userID][commentID] = !cur
 	return !cur
@@ -791,8 +795,12 @@ func (c *Client) ToggleCommentLike(userID, commentID string) (liked bool) {
 
 // ToggleCommentHeart toggles heart (love) state in memory for a user (or channel owner)
 func (c *Client) ToggleCommentHeart(userID, commentID string) (hearted bool) {
-	if userID == "" || commentID == "" { return false }
-	if c.commentHearts[userID] == nil { c.commentHearts[userID] = make(map[string]bool) }
+	if userID == "" || commentID == "" {
+		return false
+	}
+	if c.commentHearts[userID] == nil {
+		c.commentHearts[userID] = make(map[string]bool)
+	}
 	cur := c.commentHearts[userID][commentID]
 	c.commentHearts[userID][commentID] = !cur
 	return !cur
@@ -800,13 +808,19 @@ func (c *Client) ToggleCommentHeart(userID, commentID string) (hearted bool) {
 
 // EnrichReactions annotates comments with liked/loved flags for a user
 func (c *Client) EnrichReactions(userID string, comments []interface{}) {
-	if userID == "" { return }
+	if userID == "" {
+		return
+	}
 	likes := c.commentLikes[userID]
 	hearts := c.commentHearts[userID]
 	for i, v := range comments {
 		if cm, ok := v.(model.YouTubeComment); ok {
-			if likes != nil && likes[cm.ID] { cm.Liked = true }
-			if hearts != nil && hearts[cm.ID] { cm.Loved = true }
+			if likes != nil && likes[cm.ID] {
+				cm.Liked = true
+			}
+			if hearts != nil && hearts[cm.ID] {
+				cm.Loved = true
+			}
 			// update slice
 			comments[i] = cm
 		}

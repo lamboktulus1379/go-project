@@ -50,12 +50,15 @@ func (userUsecase *UserUsecase) Login(ctx context.Context, req model.ReqLogin) d
 	secretKey := configuration.C.App.SecretKey
 
 	// Create the Claims
-	expiration := time.Now().Add(5 * time.Minute)
+	// Extend token validity to 24 hours (was 5 minutes)
+	expiration := time.Now().Add(24 * time.Hour)
 
+	// Build JWT claims. Use standard registered claim name "iss" for issuer so middleware can extract user_id.
 	claims := make(map[string]interface{})
 	claims["user_name"] = user.UserName
 	claims["exp"] = expiration.Unix()
-	claims["is"] = fmt.Sprint(user.ID)
+	// Use issuer as the numeric user ID string
+	claims["iss"] = fmt.Sprint(user.ID)
 
 	accessToken, err := utils.GenerateToken(claims, secretKey)
 	if err != nil {

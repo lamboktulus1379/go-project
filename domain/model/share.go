@@ -10,6 +10,7 @@ type VideoShareRecord struct {
 	UserID       string    `json:"user_id"`
 	Status       string    `json:"status"` // pending | success | failed
 	ErrorMessage *string   `json:"error_message,omitempty"`
+	ExternalRef  *string   `json:"external_ref,omitempty"`
 	AttemptCount int       `json:"attempt_count"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
@@ -51,6 +52,7 @@ type ShareJob struct {
 	Status    string    `json:"status"` // pending | running | success | failed
 	Attempts  int       `json:"attempts"`
 	LastError *string   `json:"last_error,omitempty"`
+	ExternalRef *string `json:"external_ref,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

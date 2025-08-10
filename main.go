@@ -21,6 +21,7 @@ import (
 	"my-project/infrastructure/persistence"
 	"my-project/infrastructure/pubsub"
 	"my-project/infrastructure/servicebus"
+	"my-project/domain/repository"
 	httpHandler "my-project/interfaces/http"
 	"my-project/server"
 	"my-project/usecase"
@@ -139,6 +140,7 @@ func main() {
 
 	var youtubeHandler httpHandler.IYouTubeHandler
 	var youtubeAuthHandler httpHandler.IYouTubeAuthHandler
+	var youtubeClient repository.IYouTube // keep reference for share enrichment
 
 	// Always try to initialize YouTube auth handler (doesn't require tokens)
 	youtubeAuthHandler, err = httpHandler.NewYouTubeAuthHandler()
@@ -166,7 +168,7 @@ func main() {
 		}
 
 		// Initialize YouTube client
-		youtubeClient, err := youtubeclient.NewYouTubeClient(ctx, youtubeClientConfig)
+		youtubeClient, err = youtubeclient.NewYouTubeClient(ctx, youtubeClientConfig)
 		if err != nil {
 			logger.GetLogger().WithField("error", err).Warn("Failed to initialize YouTube client - YouTube features will be disabled")
 		} else {
@@ -184,13 +186,26 @@ func main() {
 
 	// Share feature wiring (now using PostgreSQL DB)
 	shareRepo := persistence.NewShareRepository(psqlDb)
-	oauthRepo := persistence.NewOAuthTokenRepository(mysqlDb)
+	// Use PostgreSQL for OAuth tokens (queries use $1 style placeholders)
+	oauthRepo := persistence.NewOAuthTokenRepository(psqlDb)
+	if err := persistence.EnsureOAuthTokenSchema(psqlDb); err != nil {
+		logger.GetLogger().WithField("error", err).Error("failed ensuring oauth token schema")
+	}
+	if err := persistence.EnsureShareSchema(psqlDb); err != nil {
+		logger.GetLogger().WithField("error", err).Error("failed ensuring share schema (external_ref columns)")
+	}
 	var shareHandler httpHandler.IShareHandler
 	if len(configuration.C.Share.Platforms) == 0 {
 		configuration.C.Share.Platforms = []string{"twitter", "facebook", "whatsapp"}
 	}
-	shareUsecase := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms)
-	shareHandler = httpHandler.NewShareHandler(shareUsecase, configuration.C.Share.Platforms)
+	if youtubeClient != nil {
+		shareUsecase := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms, youtubeClient)
+		shareHandler = httpHandler.NewShareHandler(shareUsecase, configuration.C.Share.Platforms)
+	} else {
+		shareUsecase := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms)
+		shareHandler = httpHandler.NewShareHandler(shareUsecase, configuration.C.Share.Platforms)
+	}
+
 
 	// Facebook OAuth handler (uses same oauth token repo)
 	facebookOAuthHandler := httpHandler.NewFacebookOAuthHandler(oauthRepo)
@@ -209,7 +224,7 @@ func main() {
 				case <-ticker.C:
 					// Process up to N pending jobs each tick
 					procCtx, cancelProc := context.WithTimeout(ctx, 5*time.Second)
-					_ = usecase.ProcessShareJobs(procCtx, shareRepo, oauthRepo, 10)
+					_ = usecase.ProcessShareJobs(procCtx, shareRepo, oauthRepo, youtubeClient, 10)
 					cancelProc()
 				}
 			}
@@ -231,7 +246,7 @@ func main() {
 	}()
 
 	port := app.Port
-	logger.GetLogger().WithField("port", port).Info("Starting application")
+	logger.GetLogger().WithFields(map[string]interface{}{"port": port, "tls": app.TLSEnabled}).Info("Starting application")
 	g.Go(func() error {
 		httpServer := &http.Server{
 			Addr:         fmt.Sprintf(":%d", port),
@@ -239,10 +254,27 @@ func main() {
 			ReadTimeout:  0,
 			WriteTimeout: 0,
 		}
-		if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			return err
+		// Keep reference for graceful shutdown
+		// (re-use package-level httpServer variable if needed elsewhere)
+		if app.TLSEnabled {
+			cert := app.TLSCertFile
+			key := app.TLSKeyFile
+			if cert == "" || key == "" {
+				logger.GetLogger().Error("TLS enabled but cert or key path empty; falling back to HTTP")
+				if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+					return err
+				}
+			} else {
+				logger.GetLogger().WithFields(map[string]interface{}{"cert": cert, "key": key}).Info("Serving HTTPS")
+				if err := httpServer.ListenAndServeTLS(cert, key); !errors.Is(err, http.ErrServerClosed) {
+					return err
+				}
+			}
+		} else {
+			if err := httpServer.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+				return err
+			}
 		}
-		logger.GetLogger().WithField("port", port).Error("Application start")
 		return nil
 	})
 

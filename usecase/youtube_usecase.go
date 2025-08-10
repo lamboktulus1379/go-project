@@ -341,20 +341,27 @@ func (u *YouTubeUseCase) RemoveVideoRating(ctx context.Context, videoID string) 
 	return nil
 }
 
-
 // ToggleCommentLike toggles like state (in-memory) for a user's comment
 func (u *YouTubeUseCase) ToggleCommentLike(ctx context.Context, userID, commentID string) (bool, error) {
-	if userID == "" || commentID == "" { return false, fmt.Errorf("userID and commentID are required") }
+	if userID == "" || commentID == "" {
+		return false, fmt.Errorf("userID and commentID are required")
+	}
 	liked, err := u.youtubeRepo.ToggleUserCommentLike(ctx, userID, commentID)
-	if err != nil { return false, fmt.Errorf("failed to toggle comment like: %w", err) }
+	if err != nil {
+		return false, fmt.Errorf("failed to toggle comment like: %w", err)
+	}
 	return liked, nil
 }
 
 // ToggleCommentHeart toggles heart state (in-memory) for a user's comment
 func (u *YouTubeUseCase) ToggleCommentHeart(ctx context.Context, userID, commentID string) (bool, error) {
-	if userID == "" || commentID == "" { return false, fmt.Errorf("userID and commentID are required") }
+	if userID == "" || commentID == "" {
+		return false, fmt.Errorf("userID and commentID are required")
+	}
 	loved, err := u.youtubeRepo.ToggleUserCommentHeart(ctx, userID, commentID)
-	if err != nil { return false, fmt.Errorf("failed to toggle comment heart: %w", err) }
+	if err != nil {
+		return false, fmt.Errorf("failed to toggle comment heart: %w", err)
+	}
 	return loved, nil
 }
 

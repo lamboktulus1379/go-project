@@ -25,8 +25,11 @@ type Config struct {
 }
 
 type App struct {
-	Port      int    `json:"port"`
-	SecretKey string `json:"secretKey"`
+	Port        int    `json:"port"`
+	SecretKey   string `json:"secretKey"`
+	TLSEnabled  bool   `json:"tlsEnabled"`
+	TLSCertFile string `json:"tlsCertFile"`
+	TLSKeyFile  string `json:"tlsKeyFile"`
 }
 
 type Database struct {
@@ -129,6 +132,7 @@ var C Config
 func init() {
 	LoadConfig()
 	initDatabase(&C)
+	initApp(&C)
 }
 
 func LoadConfig() {
@@ -179,5 +183,23 @@ func initDatabase(C *Config) {
 	}
 	if C.Database.Psql.Port == "" {
 		C.Database.Psql.Port = os.Getenv("DB_PORT")
+	}
+}
+
+func initApp(C *Config) {
+	// Allow overriding TLS settings via env variables
+	if !C.App.TLSEnabled {
+		if v := os.Getenv("TLS_ENABLED"); v == "1" || v == "true" || v == "TRUE" {
+			C.App.TLSEnabled = true
+		}
+	}
+	if C.App.TLSCertFile == "" {
+		C.App.TLSCertFile = os.Getenv("TLS_CERT_FILE")
+	}
+	if C.App.TLSKeyFile == "" {
+		C.App.TLSKeyFile = os.Getenv("TLS_KEY_FILE")
+	}
+	if C.App.TLSEnabled {
+		logger.GetLogger().WithFields(map[string]interface{}{"cert": C.App.TLSCertFile, "key": C.App.TLSKeyFile}).Info("TLS enabled via configuration")
 	}
 }
