@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"my-project/usecase"
 	"my-project/infrastructure/logger"
+	"my-project/usecase"
 
 	"github.com/gin-gonic/gin"
 )

@@ -46,13 +46,13 @@ type OAuthToken struct {
 
 // ShareJob represents a queued backend share action (server_post)
 type ShareJob struct {
-	ID        int64     `json:"id"`
-	RecordID  int64     `json:"record_id"`
-	Platform  string    `json:"platform"`
-	Status    string    `json:"status"` // pending | running | success | failed
-	Attempts  int       `json:"attempts"`
-	LastError *string   `json:"last_error,omitempty"`
-	ExternalRef *string `json:"external_ref,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          int64     `json:"id"`
+	RecordID    int64     `json:"record_id"`
+	Platform    string    `json:"platform"`
+	Status      string    `json:"status"` // pending | running | success | failed
+	Attempts    int       `json:"attempts"`
+	LastError   *string   `json:"last_error,omitempty"`
+	ExternalRef *string   `json:"external_ref,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }

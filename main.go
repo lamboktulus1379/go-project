@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"my-project/domain/repository"
 	"my-project/infrastructure/cache"
 	tulushost "my-project/infrastructure/clients/tulustech"
 	youtubeclient "my-project/infrastructure/clients/youtube"
@@ -21,7 +22,6 @@ import (
 	"my-project/infrastructure/persistence"
 	"my-project/infrastructure/pubsub"
 	"my-project/infrastructure/servicebus"
-	"my-project/domain/repository"
 	httpHandler "my-project/interfaces/http"
 	"my-project/server"
 	"my-project/usecase"
@@ -205,7 +205,6 @@ func main() {
 		shareUsecase := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms)
 		shareHandler = httpHandler.NewShareHandler(shareUsecase, configuration.C.Share.Platforms)
 	}
-
 
 	// Facebook OAuth handler (uses same oauth token repo)
 	facebookOAuthHandler := httpHandler.NewFacebookOAuthHandler(oauthRepo)

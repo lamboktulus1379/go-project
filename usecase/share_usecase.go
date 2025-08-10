@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
- 
 
 	"my-project/domain/model"
 	"my-project/domain/repository"
@@ -152,14 +151,20 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 			if ytRepo != nil {
 				ctxVid, cancel := context.WithTimeout(ctx, 2*time.Second)
 				if v, vErr := ytRepo.GetVideoDetails(ctxVid, rec.VideoID); vErr == nil && v != nil {
-					if v.Title != "" { title = v.Title }
-					if v.Description != "" { desc = v.Description }
+					if v.Title != "" {
+						title = v.Title
+					}
+					if v.Description != "" {
+						desc = v.Description
+					}
 				}
 				cancel()
 			}
 			// Compose simplified message: title, optional description, URL
 			if desc != "" {
-				if len(desc) > 500 { desc = desc[:497] + "..." }
+				if len(desc) > 500 {
+					desc = desc[:497] + "..."
+				}
 			}
 			// Extract existing hashtags from title/description
 			hashtagSet := make(map[string]struct{})
@@ -181,7 +186,9 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 							break
 						}
 						tag := word.String()
-						if len(tag) > 1 { hashtagSet[strings.ToLower(tag)] = struct{}{} }
+						if len(tag) > 1 {
+							hashtagSet[strings.ToLower(tag)] = struct{}{}
+						}
 						i = j - 1
 					}
 				}
@@ -198,17 +205,30 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 			ordered := []string{}
 			preferredOrder := []string{"#alkitab", "#ayatalkitab", "#grateful"}
 			for _, d := range preferredOrder {
-				if _, ok := hashtagSet[d]; ok { ordered = append(ordered, d) }
+				if _, ok := hashtagSet[d]; ok {
+					ordered = append(ordered, d)
+				}
 			}
 			// Add any other discovered hashtags (excluding already added)
 			for k := range hashtagSet {
 				found := false
-				for _, o := range ordered { if o == k { found = true; break } }
-				if !found && k != "#alkitab" && k != "#ayatalkitab" && k != "#grateful" { ordered = append(ordered, k) }
+				for _, o := range ordered {
+					if o == k {
+						found = true
+						break
+					}
+				}
+				if !found && k != "#alkitab" && k != "#ayatalkitab" && k != "#grateful" {
+					ordered = append(ordered, k)
+				}
 			}
 			parts := []string{title}
-			if desc != "" { parts = append(parts, desc) }
-			if len(ordered) > 0 { parts = append(parts, strings.Join(ordered, " ")) }
+			if desc != "" {
+				parts = append(parts, desc)
+			}
+			if len(ordered) > 0 {
+				parts = append(parts, strings.Join(ordered, " "))
+			}
 			parts = append(parts, watchURL)
 			rawMessage := strings.Join(parts, "\n\n")
 			form := url.Values{}
@@ -232,7 +252,9 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 				break
 			}
 			// Parse post id if present
-			var fbResp struct { ID string `json:"id"` }
+			var fbResp struct {
+				ID string `json:"id"`
+			}
 			if json.Unmarshal(body, &fbResp) == nil && fbResp.ID != "" {
 				_ = shareRepo.UpdateRecordExternalRef(ctx, rec.ID, fbResp.ID)
 			}

@@ -49,7 +49,9 @@ func (r *ShareRepository) UpsertTrackShares(ctx context.Context, videoID, userID
 		if errMsg.Valid {
 			rec.ErrorMessage = &errMsg.String
 		}
-		if extRef.Valid { rec.ExternalRef = &extRef.String }
+		if extRef.Valid {
+			rec.ExternalRef = &extRef.String
+		}
 		out = append(out, rec)
 	}
 	if err = tx.Commit(); err != nil {
@@ -74,7 +76,9 @@ func (r *ShareRepository) GetShareStatus(ctx context.Context, videoID, userID st
 		if errMsg.Valid {
 			rec.ErrorMessage = &errMsg.String
 		}
-		if extRef.Valid { rec.ExternalRef = &extRef.String }
+		if extRef.Valid {
+			rec.ExternalRef = &extRef.String
+		}
 		list = append(list, rec)
 	}
 	return list, nil
@@ -131,7 +135,9 @@ func (r *ShareRepository) FetchPendingJobs(ctx context.Context, limit int) ([]*m
 		if lastErr.Valid {
 			j.LastError = &lastErr.String
 		}
-		if extRef.Valid { j.ExternalRef = &extRef.String }
+		if extRef.Valid {
+			j.ExternalRef = &extRef.String
+		}
 		jobs = append(jobs, j)
 	}
 	return jobs, nil
@@ -164,8 +170,12 @@ func (r *ShareRepository) GetRecordByID(ctx context.Context, id int64) (*model.V
 	if err := row.Scan(&rec.ID, &rec.VideoID, &rec.Platform, &rec.UserID, &rec.Status, &errMsg, &extRef, &rec.AttemptCount, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
 		return nil, err
 	}
-	if errMsg.Valid { rec.ErrorMessage = &errMsg.String }
-	if extRef.Valid { rec.ExternalRef = &extRef.String }
+	if errMsg.Valid {
+		rec.ErrorMessage = &errMsg.String
+	}
+	if extRef.Valid {
+		rec.ExternalRef = &extRef.String
+	}
 	return rec, nil
 }
 
