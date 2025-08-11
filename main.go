@@ -20,6 +20,9 @@ import (
 	"my-project/infrastructure/googlesheet"
 	"my-project/infrastructure/logger"
 	"my-project/infrastructure/persistence"
+	"my-project/infrastructure/realtime"
+	"github.com/gin-gonic/gin"
+	"my-project/domain/model"
 	"my-project/infrastructure/pubsub"
 	"my-project/infrastructure/servicebus"
 	httpHandler "my-project/interfaces/http"
@@ -195,6 +198,7 @@ func main() {
 		logger.GetLogger().WithField("error", err).Error("failed ensuring share schema (external_ref columns)")
 	}
 	var shareHandler httpHandler.IShareHandler
+	shareHub := realtime.NewShareHub()
 	if len(configuration.C.Share.Platforms) == 0 {
 		configuration.C.Share.Platforms = []string{"twitter", "facebook", "whatsapp"}
 	}
@@ -211,6 +215,12 @@ func main() {
 
 	router := server.InitiateRouter(userHandler, testHandler, youtubeHandler, youtubeAuthHandler, userRepository, shareHandler, facebookOAuthHandler)
 
+	// SSE endpoint for real-time share status
+	if shareHandler != nil {
+		api := router.Group("api")
+		api.GET("/share/stream", func(c *gin.Context) { shareHub.Serve(c) })
+	}
+
 	// Background share job processor (simple ticker loop)
 	if shareHandler != nil {
 		g.Go(func() error {
@@ -223,7 +233,9 @@ func main() {
 				case <-ticker.C:
 					// Process up to N pending jobs each tick
 					procCtx, cancelProc := context.WithTimeout(ctx, 5*time.Second)
-					_ = usecase.ProcessShareJobs(procCtx, shareRepo, oauthRepo, youtubeClient, 10)
+					_ = usecase.ProcessShareJobs(procCtx, shareRepo, oauthRepo, youtubeClient, 10, func(rec *model.VideoShareRecord) {
+						shareHub.BroadcastShareStatus(rec)
+					})
 					cancelProc()
 				}
 			}

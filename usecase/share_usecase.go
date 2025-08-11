@@ -114,7 +114,7 @@ func (u *shareUsecase) ProcessPending(ctx context.Context, batchSize int) error 
 }
 
 // ProcessShareJobs processes pending jobs (placeholder platform logic)
-func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRepo repository.IOAuthToken, ytRepo repository.IYouTube, batchSize int) error {
+func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRepo repository.IOAuthToken, ytRepo repository.IYouTube, batchSize int, callbacks ...func(*model.VideoShareRecord)) error {
 	lg := logger.GetLogger()
 	jobs, err := shareRepo.FetchPendingJobs(ctx, batchSize)
 	if err != nil {
@@ -269,15 +269,16 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 		}
 		_ = shareRepo.MarkJobResult(ctx, job.ID, success, errMsg)
 		status := "failed"
-		if success {
-			status = "success"
-		}
+		if success { status = "success" }
 		_ = shareRepo.UpdateRecordStatus(ctx, job.RecordID, status, errMsg)
-		// Audit (video_id & user_id unknown for now) - placeholder
-		_ = shareRepo.CreateAudit(ctx, []*model.VideoShareAudit{{RecordID: job.RecordID, VideoID: "", Platform: platform, UserID: "", Status: status, ErrorMessage: errMsg, CreatedAt: time.Now().UTC()}})
-		if errMsg != nil {
-			lg.WithField("job_id", job.ID).WithField("platform", platform).WithField("error", *errMsg).Warn("share job failed")
+		// Fetch record for accurate audit + broadcast
+		if rec, rErr := shareRepo.GetRecordByID(ctx, job.RecordID); rErr == nil && rec != nil {
+			_ = shareRepo.CreateAudit(ctx, []*model.VideoShareAudit{{RecordID: job.RecordID, VideoID: rec.VideoID, Platform: platform, UserID: rec.UserID, Status: status, ErrorMessage: errMsg, CreatedAt: time.Now().UTC()}})
+			for _, cb := range callbacks { cb(rec) }
+		} else {
+			_ = shareRepo.CreateAudit(ctx, []*model.VideoShareAudit{{RecordID: job.RecordID, VideoID: "", Platform: platform, UserID: "", Status: status, ErrorMessage: errMsg, CreatedAt: time.Now().UTC()}})
 		}
+		if errMsg != nil { lg.WithField("job_id", job.ID).WithField("platform", platform).WithField("error", *errMsg).Warn("share job failed") }
 	}
 	return nil
 }
