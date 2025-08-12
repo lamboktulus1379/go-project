@@ -87,7 +87,10 @@ func (u *shareUsecase) Share(ctx context.Context, videoID, userID string, platfo
 		return nil, err
 	}
 	if mode == ShareModeServerPost {
-		_ = u.shareRepo.EnqueueJobs(ctx, records)
+		errEnq := u.shareRepo.EnqueueJobs(ctx, records)
+		if errEnq != nil {
+			logger.GetLogger().WithError(errEnq).Error("enqueue share jobs failed")
+		}
 	}
 	results := make([]ShareResult, 0, len(records))
 	for _, r := range records {
@@ -119,14 +122,17 @@ func (u *shareUsecase) Share(ctx context.Context, videoID, userID string, platfo
 	// If server_post, optionally trigger immediate async processing (fire-and-forget)
 	if mode == ShareModeServerPost {
 		go func() {
+			logger.GetLogger().WithFields(map[string]interface{}{"video_id": videoID, "user_id": userID, "platforms": norm}).Info("processing share jobs immediately")
 			// small context timeout to avoid hanging
-			c2, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			c2, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			_ = ProcessShareJobs(c2, u.shareRepo, u.tokenRepo, u.ytRepo, 5, func(rec *model.VideoShareRecord) {
+			if errProc := ProcessShareJobs(c2, u.shareRepo, u.tokenRepo, u.ytRepo, 5, func(rec *model.VideoShareRecord) {
 				if u.broadcaster != nil {
 					u.broadcaster(rec)
 				}
-			})
+			}); errProc != nil {
+				logger.GetLogger().WithError(errProc).Error("immediate job processing failed")
+			}
 		}()
 	}
 	return results, nil
@@ -159,17 +165,20 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 			if rErr != nil || rec == nil {
 				m := "record_lookup_failed"
 				errMsg = &m
+				lg.WithField("job_id", job.ID).WithError(rErr).Warn("facebook share: record lookup failed")
 				break
 			}
 			tok, tErr := tokenRepo.GetToken(ctx, rec.UserID, "facebook")
 			if tErr != nil || tok == nil || tok.AccessToken == "" {
 				m := "missing_token"
 				errMsg = &m
+				lg.WithField("job_id", job.ID).WithError(tErr).Warn("facebook share: missing token")
 				break
 			}
 			if tok.PageID == nil {
 				m := "no_page_token"
 				errMsg = &m
+				lg.WithField("job_id", job.ID).Warn("facebook share: no page id linked")
 				break
 			}
 			// Build a richer post using the public YouTube watch link so Facebook generates a preview card.
@@ -270,6 +279,7 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 			if pErr != nil {
 				m := "post_request_failed"
 				errMsg = &m
+				lg.WithField("job_id", job.ID).WithError(pErr).Warn("facebook share: request error")
 				break
 			}
 			body, _ := io.ReadAll(resp.Body)
@@ -277,6 +287,7 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 			if resp.StatusCode != 200 {
 				m := fmt.Sprintf("facebook_post_failed:%s", string(body))
 				errMsg = &m
+				lg.WithField("job_id", job.ID).WithField("status", resp.StatusCode).WithField("body", string(body)).Warn("facebook share: non-200 response")
 				break
 			}
 			// Parse post id if present
