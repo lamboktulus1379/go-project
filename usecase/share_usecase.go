@@ -14,6 +14,7 @@ import (
 	"my-project/domain/model"
 	"my-project/domain/repository"
 	"my-project/infrastructure/logger"
+	"my-project/infrastructure/persistence"
 )
 
 type ShareMode string
@@ -124,7 +125,7 @@ func (u *shareUsecase) Share(ctx context.Context, videoID, userID string, platfo
 		go func() {
 			logger.GetLogger().WithFields(map[string]interface{}{"video_id": videoID, "user_id": userID, "platforms": norm}).Info("processing share jobs immediately")
 			// small context timeout to avoid hanging
-			c2, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				c2, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			if errProc := ProcessShareJobs(c2, u.shareRepo, u.tokenRepo, u.ytRepo, 5, func(rec *model.VideoShareRecord) {
 				if u.broadcaster != nil {
@@ -158,6 +159,7 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 		success := false
 		var errMsg *string
 		platform := strings.ToLower(job.Platform)
+		retryable := false
 		switch platform {
 		case "facebook":
 			// Look up record to get user & video context
@@ -273,13 +275,17 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 			form.Set("link", watchURL)
 			form.Set("access_token", tok.AccessToken)
 			postURL := fmt.Sprintf("https://graph.facebook.com/v19.0/%s/feed", url.PathEscape(*tok.PageID))
-			req, _ := http.NewRequestWithContext(ctx, http.MethodPost, postURL, strings.NewReader(form.Encode()))
+			// Per-request timeout (10s) to avoid using possibly soon-to-expire batch ctx
+			reqCtx, cancelReq := context.WithTimeout(ctx, 10*time.Second)
+			req, _ := http.NewRequestWithContext(reqCtx, http.MethodPost, postURL, strings.NewReader(form.Encode()))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 			resp, pErr := http.DefaultClient.Do(req)
+			cancelReq()
 			if pErr != nil {
 				m := "post_request_failed"
 				errMsg = &m
 				lg.WithField("job_id", job.ID).WithError(pErr).Warn("facebook share: request error")
+				retryable = true
 				break
 			}
 			body, _ := io.ReadAll(resp.Body)
@@ -288,6 +294,7 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 				m := fmt.Sprintf("facebook_post_failed:%s", string(body))
 				errMsg = &m
 				lg.WithField("job_id", job.ID).WithField("status", resp.StatusCode).WithField("body", string(body)).Warn("facebook share: non-200 response")
+				if resp.StatusCode >= 500 || resp.StatusCode == 429 { retryable = true }
 				break
 			}
 			// Parse post id if present
@@ -311,6 +318,16 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 			status = "success"
 		}
 		_ = shareRepo.UpdateRecordStatus(ctx, job.RecordID, status, errMsg)
+		// Simple single retry logic
+		if !success && retryable && job.Attempts+1 < 2 {
+			lg.WithField("job_id", job.ID).Info("requeueing facebook job for retry")
+			if sr, ok := shareRepo.(*persistence.ShareRepository); ok {
+				// direct SQL to reset status
+				if _, err := sr.DB().ExecContext(ctx, `UPDATE share_jobs SET status='pending', updated_at=$1 WHERE id=$2`, time.Now().UTC(), job.ID); err == nil {
+					continue
+				}
+			}
+		}
 		// Fetch record for accurate audit + broadcast
 		if rec, rErr := shareRepo.GetRecordByID(ctx, job.RecordID); rErr == nil && rec != nil {
 			_ = shareRepo.CreateAudit(ctx, []*model.VideoShareAudit{{RecordID: job.RecordID, VideoID: rec.VideoID, Platform: platform, UserID: rec.UserID, Status: status, ErrorMessage: errMsg, CreatedAt: time.Now().UTC()}})

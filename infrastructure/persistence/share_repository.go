@@ -16,6 +16,9 @@ type ShareRepository struct {
 
 func NewShareRepository(db *sql.DB) *ShareRepository { return &ShareRepository{db: db} }
 
+// DB exposes the underlying *sql.DB (use sparingly; primarily for advanced operations not covered by the interface).
+func (r *ShareRepository) DB() *sql.DB { return r.db }
+
 func (r *ShareRepository) UpsertTrackShares(ctx context.Context, videoID, userID string, platforms []string, initialStatus string) ([]*model.VideoShareRecord, error) {
 	out := make([]*model.VideoShareRecord, 0, len(platforms))
 	tx, err := r.db.BeginTx(ctx, nil)
