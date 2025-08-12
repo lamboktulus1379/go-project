@@ -12,6 +12,8 @@
 - [Usage](#usage)
 - [License](#license)
  - [Migrations](#migrations)
+- [Real-time Share Status (SSE)](#real-time-share-status-sse)
+- [Architecture (Detailed Doc)](./docs/ARCHITECTURE.md)
 
 ## Description
 This project is a Go REST API with comprehensive user management and YouTube API integration. It provides endpoints for user authentication, video management, channel operations, and comment handling.
@@ -635,3 +637,162 @@ curl -X GET http://localhost:10001/api/youtube/videos \
 
 ## License
 MIT License
+
+## Real-time Share Status (SSE)
+
+This project provides live share status updates to the frontend using Server-Sent Events (SSE). The Angular app opens a single persistent EventSource connection that streams status changes for all share operations initiated by the authenticated user.
+
+### Why SSE?
+Shares can take several seconds (external API latency, retries). Instead of polling, the UI updates instantly when:
+1. A share request is accepted (immediate pending or success for track_only mode)
+2. Background processing finishes (success or failed)
+3. A retry attempt updates the attempt_count
+
+### Authentication
+Browsers cannot set custom Authorization headers on an EventSource, so the backend auth middleware accepts a `auth_token` query parameter that contains the same JWT returned at login.
+
+```
+GET /api/share/stream?auth_token=JWT_TOKEN_HERE
+Accept: text/event-stream
+```
+
+If the token is invalid or missing the stream responds `401` and closes.
+
+### Backend Route & Hub
+`main.go` wires `/api/share/stream` through the auth middleware into the share hub (`infrastructure/realtime/share_hub.go`). Each connected user gets an in-memory channel. When share records change, the usecase invokes the broadcaster which fan-outs a JSON event.
+
+### Event Payload
+All events use the SSE event name `share_status` and JSON data:
+```json
+{
+  "type": "share_status",
+  "video_id": "YOUTUBE_VIDEO_ID",
+  "platform": "facebook",
+  "status": "pending | success | failed",
+  "external_ref": "<external post id, optional>",
+  "error": "<error message if failed>",
+  "attempt_count": 1
+}
+```
+
+Field notes:
+- `status` progression (server_post): pending -> (success|failed). For `track_only` mode it is immediately `success` (no background job).
+- `attempt_count` increases when a retry is attempted (e.g. transient Facebook errors). The UI can show spinners while pending and badge counts for retries.
+- `external_ref` is populated (when available) with the created post ID (e.g. Facebook feed post ID) so the UI can build a link.
+
+### Share Request API
+```
+POST /api/share
+Authorization: Bearer <JWT>
+Content-Type: application/json
+
+{
+  "video_id": "YOUTUBE_VIDEO_ID",
+  "platforms": ["facebook"],
+  "mode": "server_post",     // or "track_only"
+  "force": false               // set true to re-share even if already success
+}
+```
+
+Immediate response (example):
+```json
+[
+  {"platform":"facebook","status":"pending","alreadyShared":false}
+]
+```
+An SSE `pending` event is broadcast right away (so UI disables the button & shows spinner). Later the processor sends a final `success` or `failed` event.
+
+### Processing Flow
+Text sequence summary:
+```
+User -> API: POST /api/share (server_post)
+API -> DB: Upsert share records (status=pending)
+API -> Hub: Broadcast pending event(s)
+API -> Worker (goroutine): Process jobs immediately (HTTP post to platform)
+Worker -> DB: Update record (success/failed, attempt_count)
+Worker -> Hub: Broadcast final status event
+UI: Updates platform badge / spinner
+```
+
+### Angular Integration (Simplified)
+Service snippet illustrating both initiating a share and listening for SSE:
+```typescript
+import { Injectable, NgZone } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, Subject } from 'rxjs';
+
+export interface ShareStatusEvent {
+  type: string;
+  video_id: string;
+  platform: string;
+  status: 'pending' | 'success' | 'failed';
+  external_ref?: string;
+  error?: string;
+  attempt_count?: number;
+}
+
+@Injectable({ providedIn: 'root' })
+export class SocialShareService {
+  private baseUrl = 'http://localhost:10001';
+  private evtSource?: EventSource;
+  private status$ = new Subject<ShareStatusEvent>();
+
+  constructor(private http: HttpClient, private zone: NgZone) {}
+
+  share(videoId: string, platforms: string[], mode: 'track_only'|'server_post' = 'server_post', force = false): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/share`, { video_id: videoId, platforms, mode, force });
+  }
+
+  connectStream() {
+    if (this.evtSource) return; // singleton
+    const token = localStorage.getItem('jwt_token');
+    this.evtSource = new EventSource(`${this.baseUrl}/api/share/stream?auth_token=${token}`);
+    this.evtSource.addEventListener('share_status', (e: MessageEvent) => {
+      try {
+        const data: ShareStatusEvent = JSON.parse(e.data);
+        // Ensure change detection via NgZone
+        this.zone.run(() => this.status$.next(data));
+      } catch {}
+    });
+    this.evtSource.onerror = () => {
+      // Optional: retry with backoff
+    };
+  }
+
+  statusEvents(): Observable<ShareStatusEvent> { return this.status$.asObservable(); }
+}
+```
+
+Component usage (outline):
+```typescript
+ngOnInit() {
+  this.shareService.connectStream();
+  this.shareService.statusEvents().subscribe(evt => {
+    // update UI maps: pendingPlatforms, attempt counts, success/failed badges
+  });
+}
+```
+
+### UI Behavior Recommendations
+- Disable a platform button while a `pending` status exists for that (video, platform) tuple.
+- Show a spinner + attempt count if `attempt_count > 1`.
+- On `failed`, replace spinner with a red badge and enable a "Retry" (force re-share) button.
+- On `success`, display external link icon if `external_ref` present.
+
+### Error / Retry Logic
+Current implementation performs a single automatic retry for transient Facebook errors (network, 5xx, 429). Future enhancements (exponential backoff, configurable max attempts) can extend this without frontend changes—UI will reflect higher attempt_count values automatically.
+
+### Local Testing Quick Steps
+1. Login and copy JWT token.
+2. Open browser devtools Network tab.
+3. Trigger a share (server_post). Observe immediate SSE `pending` event in the EventStream request.
+4. After processing, observe `success` (or `failed`) event and matching UI update.
+
+### Troubleshooting
+| Symptom | Likely Cause | Action |
+|---------|--------------|--------|
+| 401 then closed stream | Missing/invalid auth_token | Ensure JWT is appended: `?auth_token=...` |
+| Stuck on pending | External API slow or timeout | Check server logs; verify retries; increase timeouts if needed |
+| No events at all | Stream not connected | Call `connectStream()` early (e.g., app init) |
+
+---

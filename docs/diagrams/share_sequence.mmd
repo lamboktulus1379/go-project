@@ -1,0 +1,27 @@
+%% Mermaid sequence diagram for share flow
+sequenceDiagram
+  autonumber
+  participant C as Client (Angular)
+  participant S as SSE Hub
+  participant A as API (Gin)
+  participant U as Usecase
+  participant R as Repository
+  participant F as Facebook API
+  participant D as DB
+  C->>A: POST /api/share
+  A->>U: Share()
+  U->>R: Upsert records (pending)
+  R-->>U: Records
+  U->>R: Enqueue jobs
+  U-->>S: broadcast pending
+  S-->>C: event: pending
+  U->>U: spawn ProcessShareJobs goroutine
+  U->>R: Fetch pending jobs
+  R-->>U: Jobs
+  U->>R: Mark running
+  U->>F: POST feed
+  F-->>U: 200 OK / error
+  U->>R: Update record (success/failed)
+  U->>R: Mark job result
+  U-->>S: broadcast final status
+  S-->>C: event: success/failed

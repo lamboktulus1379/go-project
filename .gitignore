@@ -71,6 +71,11 @@ youtube-api-app
 main
 app
 
-# Local documentation (use docs/ in repo root instead)
+# Local documentation: previously fully ignored. Allow curated architecture docs & diagrams.
 docs/
+!docs/ARCHITECTURE.md
+!docs/diagrams/
+!docs/diagrams/*.mmd
+!docs/diagrams/*.png
+!docs/diagrams/*.svg
 token.json

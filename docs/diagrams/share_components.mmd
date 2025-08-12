@@ -1,0 +1,28 @@
+%% Mermaid component diagram for share architecture
+graph LR
+  subgraph Frontend
+    UI[Angular Components]
+    SSE[EventSource]
+    UI --> SSE
+  end
+  subgraph Backend
+    Gin[REST API]
+    Auth[Auth MW]
+    UC[Share Usecase]
+    Hub[SSE Hub]
+    Repo[(ShareRepository)]
+    DB[(DB)]
+  end
+  subgraph External
+    FB[Facebook Graph]
+    YT[YouTube Data]
+  end
+  UI -->|POST /api/share| Gin
+  SSE -->|GET /api/share/stream?auth_token=JWT| Gin
+  Gin --> Auth --> Gin
+  Gin --> UC
+  UC --> Repo --> DB
+  UC -->|broadcast pending/final| Hub --> SSE
+  UC -->|enrich| YT
+  UC -->|post| FB
+  FB --> UC
