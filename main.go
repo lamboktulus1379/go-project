@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"my-project/domain/model"
 	"my-project/domain/repository"
 	"my-project/infrastructure/cache"
 	tulushost "my-project/infrastructure/clients/tulustech"
@@ -20,14 +21,14 @@ import (
 	"my-project/infrastructure/googlesheet"
 	"my-project/infrastructure/logger"
 	"my-project/infrastructure/persistence"
-	"my-project/infrastructure/realtime"
-	"github.com/gin-gonic/gin"
-	"my-project/domain/model"
 	"my-project/infrastructure/pubsub"
+	"my-project/infrastructure/realtime"
 	"my-project/infrastructure/servicebus"
 	httpHandler "my-project/interfaces/http"
 	"my-project/server"
 	"my-project/usecase"
+
+	"github.com/gin-gonic/gin"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -203,11 +204,13 @@ func main() {
 		configuration.C.Share.Platforms = []string{"twitter", "facebook", "whatsapp"}
 	}
 	if youtubeClient != nil {
-		shareUsecase := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms, youtubeClient)
-		shareHandler = httpHandler.NewShareHandler(shareUsecase, configuration.C.Share.Platforms)
+		shareUC := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms, youtubeClient)
+		shareUC = shareUC.WithBroadcaster(func(rec *model.VideoShareRecord) { shareHub.BroadcastShareStatus(rec) })
+		shareHandler = httpHandler.NewShareHandler(shareUC, configuration.C.Share.Platforms)
 	} else {
-		shareUsecase := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms)
-		shareHandler = httpHandler.NewShareHandler(shareUsecase, configuration.C.Share.Platforms)
+		shareUC := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms)
+		shareUC = shareUC.WithBroadcaster(func(rec *model.VideoShareRecord) { shareHub.BroadcastShareStatus(rec) })
+		shareHandler = httpHandler.NewShareHandler(shareUC, configuration.C.Share.Platforms)
 	}
 
 	// Facebook OAuth handler (uses same oauth token repo)

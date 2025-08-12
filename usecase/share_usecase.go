@@ -34,13 +34,15 @@ type IShareUsecase interface {
 	Share(ctx context.Context, videoID, userID string, platforms []string, mode ShareMode, force bool) ([]ShareResult, error)
 	GetStatus(ctx context.Context, videoID, userID string) ([]*model.VideoShareRecord, error)
 	ProcessPending(ctx context.Context, batchSize int) error
+	WithBroadcaster(func(*model.VideoShareRecord)) IShareUsecase
 }
 
 type shareUsecase struct {
-	shareRepo repository.IShare
-	tokenRepo repository.IOAuthToken
-	ytRepo    repository.IYouTube // optional for enrichment
-	allowed   map[string]struct{}
+	shareRepo   repository.IShare
+	tokenRepo   repository.IOAuthToken
+	ytRepo      repository.IYouTube // optional for enrichment
+	allowed     map[string]struct{}
+	broadcaster func(*model.VideoShareRecord) // optional SSE broadcaster
 }
 
 func NewShareUsecase(shareRepo repository.IShare, tokenRepo repository.IOAuthToken, allowed []string, ytRepo ...repository.IYouTube) IShareUsecase {
@@ -53,6 +55,12 @@ func NewShareUsecase(shareRepo repository.IShare, tokenRepo repository.IOAuthTok
 		su.ytRepo = ytRepo[0]
 	}
 	return su
+}
+
+// WithBroadcaster allows injecting a broadcaster (e.g. SSE hub) after construction.
+func (u *shareUsecase) WithBroadcaster(b func(*model.VideoShareRecord)) IShareUsecase {
+	u.broadcaster = b
+	return u
 }
 
 func (u *shareUsecase) Share(ctx context.Context, videoID, userID string, platforms []string, mode ShareMode, force bool) ([]ShareResult, error) {
@@ -101,6 +109,25 @@ func (u *shareUsecase) Share(ctx context.Context, videoID, userID string, platfo
 			msg = *r.ErrorMessage
 		}
 		results = append(results, ShareResult{Platform: r.Platform, Status: r.Status, AlreadyShared: already, ErrorMessage: msg})
+		// Immediate broadcast of current state (track_only success or server_post pending)
+		if u.broadcaster != nil {
+			// copy to avoid race
+			recCopy := *r
+			go u.broadcaster(&recCopy)
+		}
+	}
+	// If server_post, optionally trigger immediate async processing (fire-and-forget)
+	if mode == ShareModeServerPost {
+		go func() {
+			// small context timeout to avoid hanging
+			c2, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			_ = ProcessShareJobs(c2, u.shareRepo, u.tokenRepo, u.ytRepo, 5, func(rec *model.VideoShareRecord) {
+				if u.broadcaster != nil {
+					u.broadcaster(rec)
+				}
+			})
+		}()
 	}
 	return results, nil
 }
@@ -269,16 +296,22 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 		}
 		_ = shareRepo.MarkJobResult(ctx, job.ID, success, errMsg)
 		status := "failed"
-		if success { status = "success" }
+		if success {
+			status = "success"
+		}
 		_ = shareRepo.UpdateRecordStatus(ctx, job.RecordID, status, errMsg)
 		// Fetch record for accurate audit + broadcast
 		if rec, rErr := shareRepo.GetRecordByID(ctx, job.RecordID); rErr == nil && rec != nil {
 			_ = shareRepo.CreateAudit(ctx, []*model.VideoShareAudit{{RecordID: job.RecordID, VideoID: rec.VideoID, Platform: platform, UserID: rec.UserID, Status: status, ErrorMessage: errMsg, CreatedAt: time.Now().UTC()}})
-			for _, cb := range callbacks { cb(rec) }
+			for _, cb := range callbacks {
+				cb(rec)
+			}
 		} else {
 			_ = shareRepo.CreateAudit(ctx, []*model.VideoShareAudit{{RecordID: job.RecordID, VideoID: "", Platform: platform, UserID: "", Status: status, ErrorMessage: errMsg, CreatedAt: time.Now().UTC()}})
 		}
-		if errMsg != nil { lg.WithField("job_id", job.ID).WithField("platform", platform).WithField("error", *errMsg).Warn("share job failed") }
+		if errMsg != nil {
+			lg.WithField("job_id", job.ID).WithField("platform", platform).WithField("error", *errMsg).Warn("share job failed")
+		}
 	}
 	return nil
 }
