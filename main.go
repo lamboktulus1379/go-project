@@ -25,6 +25,7 @@ import (
 	"my-project/infrastructure/realtime"
 	"my-project/infrastructure/servicebus"
 	httpHandler "my-project/interfaces/http"
+	"my-project/interfaces/middleware"
 	"my-project/server"
 	"my-project/usecase"
 
@@ -220,7 +221,9 @@ func main() {
 
 	// SSE endpoint for real-time share status
 	if shareHandler != nil {
+		// Re-create group with auth middleware so user_id is populated (previous code lacked middleware causing 401)
 		api := router.Group("api")
+		api.Use(middleware.Auth(userRepository))
 		api.GET("/share/stream", func(c *gin.Context) { shareHub.Serve(c) })
 	}
 
