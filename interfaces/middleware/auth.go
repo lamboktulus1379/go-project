@@ -22,6 +22,12 @@ func Auth(userRepository repository.IUser) gin.HandlerFunc {
 
 	return func(ctx *gin.Context) {
 		authorization := ctx.Request.Header.Get("Authorization")
+		// Support auth_token query param for SSE/EventSource where custom headers aren't possible
+		if authorization == "" {
+			if qt := ctx.Query("auth_token"); qt != "" {
+				authorization = "Bearer " + qt
+			}
+		}
 		secretKey := configuration.C.App.SecretKey
 		if authorization == "" {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, res)
