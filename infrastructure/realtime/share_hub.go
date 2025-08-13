@@ -12,13 +12,13 @@ import (
 
 // ShareStatusEvent represents an SSE payload for share status updates.
 type ShareStatusEvent struct {
-	Type        string  `json:"type"`
-	VideoID     string  `json:"video_id"`
-	Platform    string  `json:"platform"`
-	Status      string  `json:"status"`
-	ExternalRef *string `json:"external_ref,omitempty"`
-	Error       *string `json:"error,omitempty"`
-	AttemptCount int    `json:"attempt_count,omitempty"`
+	Type         string  `json:"type"`
+	VideoID      string  `json:"video_id"`
+	Platform     string  `json:"platform"`
+	Status       string  `json:"status"`
+	ExternalRef  *string `json:"external_ref,omitempty"`
+	Error        *string `json:"error,omitempty"`
+	AttemptCount int     `json:"attempt_count,omitempty"`
 }
 
 // Hub maintains per-user subscribers listening for share status events.
@@ -96,12 +96,12 @@ func (h *Hub) BroadcastShareStatus(rec *model.VideoShareRecord) {
 		return
 	}
 	evt := ShareStatusEvent{
-		Type:        "share_status",
-		VideoID:     rec.VideoID,
-		Platform:    rec.Platform,
-		Status:      rec.Status,
-		ExternalRef: rec.ExternalRef,
-		Error:       rec.ErrorMessage,
+		Type:         "share_status",
+		VideoID:      rec.VideoID,
+		Platform:     rec.Platform,
+		Status:       rec.Status,
+		ExternalRef:  rec.ExternalRef,
+		Error:        rec.ErrorMessage,
 		AttemptCount: rec.AttemptCount,
 	}
 	h.mu.RLock()

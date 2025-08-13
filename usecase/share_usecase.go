@@ -125,7 +125,7 @@ func (u *shareUsecase) Share(ctx context.Context, videoID, userID string, platfo
 		go func() {
 			logger.GetLogger().WithFields(map[string]interface{}{"video_id": videoID, "user_id": userID, "platforms": norm}).Info("processing share jobs immediately")
 			// small context timeout to avoid hanging
-				c2, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			c2, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
 			if errProc := ProcessShareJobs(c2, u.shareRepo, u.tokenRepo, u.ytRepo, 5, func(rec *model.VideoShareRecord) {
 				if u.broadcaster != nil {
@@ -294,7 +294,9 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 				m := fmt.Sprintf("facebook_post_failed:%s", string(body))
 				errMsg = &m
 				lg.WithField("job_id", job.ID).WithField("status", resp.StatusCode).WithField("body", string(body)).Warn("facebook share: non-200 response")
-				if resp.StatusCode >= 500 || resp.StatusCode == 429 { retryable = true }
+				if resp.StatusCode >= 500 || resp.StatusCode == 429 {
+					retryable = true
+				}
 				break
 			}
 			// Parse post id if present
