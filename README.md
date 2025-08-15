@@ -1,3 +1,21 @@
+## Local HTTPS (OAuth-friendly)
+
+To run the backend over HTTPS (required by Facebook and recommended for OAuth callbacks):
+
+1. Install mkcert (preferred) or ensure OpenSSL is available.
+2. Run: `make run-https`
+
+This will:
+
+- Generate a trusted localhost certificate (via mkcert) or a self-signed one as fallback.
+- Export TLS_ENABLED=1 and certificate paths for the server.
+- Default OAuth callbacks to:
+  - https://localhost:10001/auth/youtube/callback
+  - https://localhost:10001/auth/facebook/callback
+
+You can override with env vars `YOUTUBE_REDIRECT_URL` and `FACEBOOK_REDIRECT_URL`.
+
+Angular admin app can be run with `ng serve --ssl --proxy-config proxy.conf.json` from the FE project.
 # Go Project - API Documentation
 
 ## Table of Contents

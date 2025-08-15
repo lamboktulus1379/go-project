@@ -2,7 +2,6 @@ package configuration
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"strings"
 )
@@ -20,13 +19,18 @@ type YouTubeConfig struct {
 
 // GetYouTubeConfig returns YouTube configuration from JSON config with environment variable fallback
 func GetYouTubeConfig() (*YouTubeConfig, error) {
+	// Prefer https redirect locally if TLS is enabled, else http fallback
+	defaultRedirect := "http://localhost:10001/auth/youtube/callback"
+	if C.App.TLSEnabled {
+		defaultRedirect = "https://localhost:10001/auth/youtube/callback"
+	}
 	config := &YouTubeConfig{
 		ClientID:     getConfigValue(C.YouTube.ClientID, "YOUTUBE_CLIENT_ID", ""),
 		ClientSecret: getConfigValue(C.YouTube.ClientSecret, "YOUTUBE_CLIENT_SECRET", ""),
-		RedirectURL:  getConfigValue(C.YouTube.RedirectURI, "YOUTUBE_REDIRECT_URL", "http://localhost:10001/auth/youtube/callback"),
+		RedirectURL:  getConfigValue(C.YouTube.RedirectURI, "YOUTUBE_REDIRECT_URL", defaultRedirect),
 		AccessToken:  getEnv("YOUTUBE_ACCESS_TOKEN", ""),
 		RefreshToken: getEnv("YOUTUBE_REFRESH_TOKEN", ""),
-		ChannelID:    getEnv("YOUTUBE_CHANNEL_ID", ""),
+		ChannelID:    getConfigValue(C.YouTube.ChannelID, "YOUTUBE_CHANNEL_ID", ""),
 		APIKey:       getConfigValue(C.YouTube.APIKey, "YOUTUBE_API_KEY", ""),
 	}
 
@@ -48,17 +52,8 @@ func GetYouTubeConfig() (*YouTubeConfig, error) {
 		}
 	}
 
-	// Validate required fields
-	if config.ClientID == "" || config.ClientID == "YOUR_YOUTUBE_CLIENT_ID" {
-		return nil, errors.New("YOUTUBE_CLIENT_ID is required. Please set it in config.json or environment variable")
-	}
-	if config.ClientSecret == "" || config.ClientSecret == "YOUR_YOUTUBE_CLIENT_SECRET" {
-		return nil, errors.New("YOUTUBE_CLIENT_SECRET is required. Please set it in config.json or environment variable")
-	}
-	if config.APIKey == "" || config.APIKey == "YOUR_YOUTUBE_API_KEY" {
-		return nil, errors.New("YOUTUBE_API_KEY is required. Please set it in config.json or environment variable")
-	}
-
+	// Do not hard-fail when API key or tokens are missing; allow OAuth-only flows to proceed.
+	// Client initialization will decide between API-key mode (read-only) and OAuth mode.
 	return config, nil
 }
 

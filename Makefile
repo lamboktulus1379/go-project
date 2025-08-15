@@ -1,5 +1,8 @@
 ## Makefile for Go Project (Liquibase + Build Helpers)
 
+SHELL := /bin/bash
+.ONESHELL:
+
 LB ?= liquibase
 PG_DIR := liquibase/my_project_postgres/sql
 MYSQL_DIR := liquibase/my-project/sql
@@ -19,6 +22,7 @@ help:
 	echo "  mysql-rollback       Roll back COUNT MySQL changesets" ; \
 	echo "  build                Compile Go server" ; \
 	echo "  run                  Run server (dev)" ; \
+	@echo "  run-https            Run server over HTTPS with local self-signed cert" ; \
 	echo "  tidy                 Go mod tidy" ; \
 	echo "  test                 Run Go tests" ; \
 	echo "Environment overrides: LB=<path to liquibase> COUNT=<n>" ;
@@ -71,6 +75,45 @@ build:
 
 .PHONY: run
 run:
+	go run main.go
+
+.PHONY: run-https
+run-https:
+	@mkdir -p certs
+	# Load environment variables from config.env if present
+	@if [ -f config.env ]; then \
+		echo "Loading environment from config.env" ; \
+		set -a ; . ./config.env ; set +a ; \
+	fi ; \
+	# Prefer user-provided localhost cert/key
+	@if [ -f certs/localhost.crt ] && [ -f certs/localhost.key ]; then \
+		CERT_FILE=$$(pwd)/certs/localhost.crt ; \
+		KEY_FILE=$$(pwd)/certs/localhost.key ; \
+		echo "Using provided certs: $$CERT_FILE $$KEY_FILE" ; \
+	elif command -v mkcert >/dev/null 2>&1; then \
+		echo "Using mkcert to generate a trusted localhost certificate..." ; \
+		mkcert -install >/dev/null 2>&1 || true ; \
+		if [ ! -f certs/localhost+2.pem ] || [ ! -f certs/localhost+2-key.pem ]; then \
+			( cd certs && mkcert localhost 127.0.0.1 ::1 ); \
+		fi ; \
+		CERT_FILE=$$(pwd)/certs/localhost+2.pem ; \
+		KEY_FILE=$$(pwd)/certs/localhost+2-key.pem ; \
+	else \
+		echo "mkcert not found; generating self-signed cert (may show browser warning)..." ; \
+		if [ ! -f certs/dev.localhost.crt ] || [ ! -f certs/dev.localhost.key ]; then \
+			openssl req -x509 -newkey rsa:2048 -nodes -keyout certs/dev.localhost.key -out certs/dev.localhost.crt -days 365 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1" ; \
+		fi ; \
+		CERT_FILE=$$(pwd)/certs/dev.localhost.crt ; \
+		KEY_FILE=$$(pwd)/certs/dev.localhost.key ; \
+	fi ; \
+	# Default HTTPS callback URLs
+	YOUTUBE_REDIRECT_URL=$${YOUTUBE_REDIRECT_URL:-https://localhost:10001/auth/youtube/callback} ; \
+	FACEBOOK_REDIRECT_URL=$${FACEBOOK_REDIRECT_URL:-https://localhost:10001/auth/facebook/callback} ; \
+	echo "Starting server with TLS using $$CERT_FILE" ; \
+	echo "  YouTube redirect : $$YOUTUBE_REDIRECT_URL" ; \
+	echo "  Facebook redirect: $$FACEBOOK_REDIRECT_URL" ; \
+	TLS_ENABLED=1 TLS_CERT_FILE=$$CERT_FILE TLS_KEY_FILE=$$KEY_FILE \
+	YOUTUBE_REDIRECT_URL=$$YOUTUBE_REDIRECT_URL FACEBOOK_REDIRECT_URL=$$FACEBOOK_REDIRECT_URL \
 	go run main.go
 
 .PHONY: tidy

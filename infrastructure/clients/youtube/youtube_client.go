@@ -98,14 +98,24 @@ func NewYouTubeClient(ctx context.Context, config *Config) (repository.IYouTube,
 		return nil, fmt.Errorf("failed to create YouTube service: %w", err)
 	}
 
-	return &Client{
+	client := &Client{
 		service:     service,
 		channelID:   config.ChannelID,
 		accessToken: config.AccessToken,
 		oauthConfig: oauth2Config,
 		token:       token,
 		ctx:         ctx,
-	}, nil
+	}
+
+	// If ChannelID is empty in OAuth mode, attempt to discover it via Channels.List(mine=true)
+	if client.channelID == "" {
+		if ch, err := client.GetMyChannel(ctx); err == nil && ch != nil {
+			client.channelID = ch.ID
+			logger.GetLogger().WithField("channelId", client.channelID).Info("Detected YouTube channel ID via OAuth")
+		}
+	}
+
+	return client, nil
 }
 
 // GetMyVideos retrieves videos from the authenticated user's channel

@@ -3,6 +3,7 @@ package configuration
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"my-project/infrastructure/logger"
 
@@ -106,6 +107,7 @@ type YouTube struct {
 	ClientID     string   `json:"clientId"`
 	ClientSecret string   `json:"clientSecret"`
 	RedirectURI  string   `json:"redirectURI"`
+	ChannelID    string   `json:"channelId"`
 	Scopes       []string `json:"scopes"`
 }
 
@@ -133,6 +135,15 @@ func init() {
 	LoadConfig()
 	initDatabase(&C)
 	initApp(&C)
+	// Prefer https redirect URIs locally when TLS enabled
+	if C.App.TLSEnabled {
+		if C.YouTube.RedirectURI != "" && !hasHTTPS(C.YouTube.RedirectURI) {
+			C.YouTube.RedirectURI = toHTTPSCallback(C.YouTube.RedirectURI)
+		}
+		if C.OAuth.Facebook.RedirectURI != "" && !hasHTTPS(C.OAuth.Facebook.RedirectURI) {
+			C.OAuth.Facebook.RedirectURI = toHTTPSCallback(C.OAuth.Facebook.RedirectURI)
+		}
+	}
 }
 
 func LoadConfig() {
@@ -187,6 +198,26 @@ func initDatabase(C *Config) {
 }
 
 func initApp(C *Config) {
+	// Default/fallback port: handle missing or string->int mismatch
+	if C.App.Port == 0 {
+		// Try env overrides first
+		if v := os.Getenv("APP_PORT"); v != "" {
+			if p, err := strconv.Atoi(v); err == nil {
+				C.App.Port = p
+			}
+		}
+		if C.App.Port == 0 {
+			if v := os.Getenv("PORT"); v != "" {
+				if p, err := strconv.Atoi(v); err == nil {
+					C.App.Port = p
+				}
+			}
+		}
+		// Final fallback
+		if C.App.Port == 0 {
+			C.App.Port = 10001
+		}
+	}
 	// Allow overriding TLS settings via env variables
 	if !C.App.TLSEnabled {
 		if v := os.Getenv("TLS_ENABLED"); v == "1" || v == "true" || v == "TRUE" {
@@ -199,7 +230,30 @@ func initApp(C *Config) {
 	if C.App.TLSKeyFile == "" {
 		C.App.TLSKeyFile = os.Getenv("TLS_KEY_FILE")
 	}
+	// Prefer local certs if TLS enabled and paths not provided
+	if C.App.TLSEnabled {
+		if C.App.TLSCertFile == "" {
+			if _, err := os.Stat("certs/localhost.crt"); err == nil {
+				C.App.TLSCertFile = "certs/localhost.crt"
+			}
+		}
+		if C.App.TLSKeyFile == "" {
+			if _, err := os.Stat("certs/localhost.key"); err == nil {
+				C.App.TLSKeyFile = "certs/localhost.key"
+			}
+		}
+	}
 	if C.App.TLSEnabled {
 		logger.GetLogger().WithFields(map[string]interface{}{"cert": C.App.TLSCertFile, "key": C.App.TLSKeyFile}).Info("TLS enabled via configuration")
 	}
+}
+
+// helpers to coerce local callback to https
+func hasHTTPS(u string) bool { return len(u) >= 8 && u[:8] == "https://" }
+func toHTTPSCallback(u string) string {
+	// simple swap for localhost callbacks
+	if len(u) >= 7 && u[:7] == "http://" {
+		return "https://" + u[7:]
+	}
+	return u
 }

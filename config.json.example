@@ -62,6 +62,7 @@
         "clientId": "YOUR_YOUTUBE_CLIENT_ID",
         "clientSecret": "YOUR_YOUTUBE_CLIENT_SECRET",
         "redirectURI": "http://localhost:10001/auth/youtube/callback",
+    "channelId": "YOUR_YOUTUBE_CHANNEL_ID",
         "scopes": [
             "https://www.googleapis.com/auth/youtube.readonly",
             "https://www.googleapis.com/auth/youtube.upload",
