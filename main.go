@@ -265,7 +265,7 @@ func main() {
 	port := app.Port
 	logger.GetLogger().WithFields(map[string]interface{}{"port": port, "tls": app.TLSEnabled}).Info("Starting application")
 	g.Go(func() error {
-		httpServer := &http.Server{
+		httpServer = &http.Server{
 			Addr:         fmt.Sprintf(":%d", port),
 			Handler:      router,
 			ReadTimeout:  0,

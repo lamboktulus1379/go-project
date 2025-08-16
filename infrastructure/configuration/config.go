@@ -218,10 +218,13 @@ func initApp(C *Config) {
 			C.App.Port = 10001
 		}
 	}
-	// Allow overriding TLS settings via env variables
-	if !C.App.TLSEnabled {
-		if v := os.Getenv("TLS_ENABLED"); v == "1" || v == "true" || v == "TRUE" {
+	// Allow overriding TLS settings via env variables (both enable and disable)
+	if v := os.Getenv("TLS_ENABLED"); v != "" {
+		switch v {
+		case "1", "true", "TRUE", "True":
 			C.App.TLSEnabled = true
+		case "0", "false", "FALSE", "False":
+			C.App.TLSEnabled = false
 		}
 	}
 	if C.App.TLSCertFile == "" {

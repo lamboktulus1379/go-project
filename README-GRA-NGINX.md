@@ -31,8 +31,8 @@ sudo brew services restart nginx
 
 Run dev:
 ```zsh
-# optional: force port
-APP_PORT=10001 go run ./...
+# optional: force port, and disable in-app TLS since Nginx handles HTTPS
+APP_PORT=10001 TLS_ENABLED=0 go run ./...
 ```
 
 ## Test
@@ -41,3 +41,15 @@ curl -kI https://gra.tulus.tech
 ```
 
 If you want the app reachable at HTTPS directly (no Nginx), set `app.tlsEnabled` true and ensure cert paths are valid; Nginx can still proxy to `https://127.0.0.1:10001` by adjusting `proxy_pass` accordingly.
+
+## Auto-run with launchd (optional)
+You can have the app auto-start on login (port 10001, TLS disabled behind Nginx):
+
+```zsh
+# one-time: load/update the job and start
+chmod +x ./local-dev/deploy-run.sh
+./local-dev/deploy-run.sh
+
+# tail logs
+tail -f ~/Library/Logs/go-project.out.log
+```
