@@ -24,13 +24,13 @@ func InitiateRouter(
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://tulus.tech", "http://localhost:4201", "http://localhost:4200", "https://localhost:4201", "https://localhost:4200"},
+		AllowOrigins:     []string{"https://tulus.tech", "https://admin.tulus.tech", "http://localhost:4201", "http://localhost:4200", "https://localhost:4201", "https://localhost:4200"},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		AllowOriginFunc: func(origin string) bool {
-			return origin == "https://tulus.tech" || origin == "http://localhost:4201" || origin == "http://localhost:4200" || origin == "https://localhost:4201" || origin == "https://localhost:4200"
+			return origin == "https://tulus.tech" || origin == "https://admin.tulus.tech" || origin == "http://localhost:4201" || origin == "http://localhost:4200" || origin == "https://localhost:4201" || origin == "https://localhost:4200"
 		},
 		MaxAge: 12 * time.Hour,
 	}))

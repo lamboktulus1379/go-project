@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"time"
 
-	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
 	"my-project/domain/model"
 	"my-project/infrastructure/logger"
 	"my-project/infrastructure/worker"
+
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type ITestRepository interface {
@@ -30,12 +31,25 @@ func (t *TestRepository) Test(ctx context.Context) ([]model.Project, error) {
 			UpdatedAt:   time.Now(),
 		},
 	}
-	worker.PooledWorkError(myProjects, t.PostgresDB)
+	// Safely use Postgres worker if available
+	if t.PostgresDB != nil {
+		worker.PooledWorkError(myProjects, t.PostgresDB)
+	} else {
+		logger.GetLogger().Info("PostgresDB is nil - skipping worker pipeline")
+	}
+
+	// If Mongo is not available, return the local projects only
+	if t.mongoDb == nil {
+		logger.GetLogger().Info("MongoDB client is nil - returning static projects only")
+		return myProjects, nil
+	}
+
 	collection := t.mongoDb.Database("my_project").Collection("projects")
 	cursor, err := collection.Find(ctx, bson.D{})
 	if err != nil {
 		logger.GetLogger().WithField("error", err).Error("Error while fetching data")
-		return nil, err
+		// Return static projects when Mongo fetch fails
+		return myProjects, nil
 	}
 	defer func(cursor *mongo.Cursor, ctx context.Context) {
 		err := cursor.Close(ctx)
@@ -50,8 +64,13 @@ func (t *TestRepository) Test(ctx context.Context) ([]model.Project, error) {
 		err := cursor.Decode(&project)
 		if err != nil {
 			logger.GetLogger().WithField("error", err).Error("Error while decoding")
+			continue
 		}
 		projects = append(projects, project)
+	}
+	if len(projects) == 0 {
+		// Fallback to static projects if collection empty
+		return myProjects, nil
 	}
 	return projects, nil
 }

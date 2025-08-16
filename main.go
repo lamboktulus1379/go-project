@@ -72,15 +72,16 @@ func main() {
 		configuration.C.Database.Mongo.Name,
 	)
 	if err != nil {
-		logger.GetLogger().WithField("error", err).Error("Error while instantiate MongoDB")
-		panic(err)
+		logger.GetLogger().WithField("error", err).Warn("MongoDB not available - continuing without Mongo features")
+		mongoDb = nil
+	} else {
+		if err := mongoDb.Ping(ctx, nil); err != nil {
+			logger.GetLogger().WithField("error", err).Warn("MongoDB ping failed - continuing without Mongo features")
+			mongoDb = nil
+		} else {
+			logger.GetLogger().Info("MongoDB connected successfully")
+		}
 	}
-	err = mongoDb.Ping(ctx, nil)
-	if err != nil {
-		logger.GetLogger().WithField("error", err).Error("Error while Ping MongoDB")
-		panic(err)
-	}
-	logger.GetLogger().Info("MongoDB connected successfully")
 
 	logger.GetLogger().
 		WithField("MySQLDb", mysqlDb.Ping()).
@@ -95,8 +96,8 @@ func main() {
 
 	azServiceBusClient, err := servicebus.NewServiceBus(ctx, configuration.C.ServiceBus.Namespace)
 	if err != nil {
-		logger.GetLogger().WithField("error", err).Error("Error while instantiate ServiceBus")
-		panic(err)
+		logger.GetLogger().WithField("error", err).Warn("Azure Service Bus not available - continuing without Service Bus features")
+		azServiceBusClient = nil
 	}
 	redisClient, _ := cache.NewCache(
 		ctx,
