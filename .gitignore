@@ -79,3 +79,6 @@ docs/
 !docs/diagrams/*.png
 !docs/diagrams/*.svg
 token.json
+
+# Local TLS certs
+certs/
