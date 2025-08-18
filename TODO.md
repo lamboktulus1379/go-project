@@ -30,6 +30,9 @@ This document tracks completed work, near-term next steps, and longer‑term bac
 5. Template Customization
    - Configurable message template per platform: e.g. `{{title}}\n\n{{description}}\n\n{{hashtags}}\n\n{{url}}`.
    - Allow enabling/disabling description or hashtags.
+6. YouTube OAuth Status Endpoint
+   - Implement `/api/youtube/oauth/status` to check YouTube OAuth status per user/session.
+   - Return JSON: `{ "authenticated": true/false }`.
 
 ## 📊 Medium-Term Backlog
 - Analytics Fetch Endpoint
@@ -83,6 +86,8 @@ This document tracks completed work, near-term next steps, and longer‑term bac
    - Transient network failure triggers reschedule; permission error marks failed permanently.
 5. Template Customization
    - Changing template in config & restarting updates subsequent share messages (not retroactive) without code changes.
+6. YouTube OAuth Status Endpoint
+   - Authenticated users return `{ "authenticated": true }`; unauthenticated return `{ "authenticated": false }`.
 
 ## 🧭 Suggested Order of Execution
 1. Configurable hashtags & template foundation (unblocks message customization).
@@ -90,6 +95,7 @@ This document tracks completed work, near-term next steps, and longer‑term bac
 3. Delete endpoint (unlocks lifecycle completeness).
 4. Retry/backoff (resilience).
 5. Metrics & analytics (observability & insights).
+6. YouTube OAuth status endpoint (completes OAuth flow visibility).
 
 ## 📝 Quick Commands (Reference)
 (Only if manual migration needed; runtime auto-migration already covers external_ref.)

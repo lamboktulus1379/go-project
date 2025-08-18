@@ -19,12 +19,19 @@ import (
 type IYouTubeAuthHandler interface {
 	GetAuthURL(ctx *gin.Context)
 	HandleCallback(ctx *gin.Context)
+	Status(ctx *gin.Context)
 }
 
 // YouTubeAuthHandler implements YouTube OAuth2 authentication
 type YouTubeAuthHandler struct {
 	oauth2Config *oauth2.Config
 }
+
+// Dummy in-memory token check for demo; replace with real user/session storage in production
+var youtubeOAuthTokens = struct {
+	AccessToken  string
+	RefreshToken string
+}{"", ""}
 
 // NewYouTubeAuthHandler creates a new YouTube auth handler
 func NewYouTubeAuthHandler() (IYouTubeAuthHandler, error) {
@@ -112,23 +119,33 @@ func (h *YouTubeAuthHandler) HandleCallback(ctx *gin.Context) {
 	// Clear the state cookie
 	ctx.SetCookie("oauth_state", "", -1, "/", "", false, true)
 
-	// Return tokens (in production, you should store these securely)
+	// Store tokens in memory (replace with DB/session in production)
+	youtubeOAuthTokens.AccessToken = token.AccessToken
+	youtubeOAuthTokens.RefreshToken = token.RefreshToken
+
 	ctx.JSON(http.StatusOK, gin.H{
 		"success":       true,
 		"access_token":  token.AccessToken,
 		"refresh_token": token.RefreshToken,
 		"token_type":    token.TokenType,
 		"expiry":        token.Expiry,
-		"message":       "Authentication successful! Please save these tokens in your environment variables.",
-		"next_steps": []string{
-			"1. Copy the access_token and refresh_token above",
-			"2. Update your environment variables:",
-			"   export YOUTUBE_ACCESS_TOKEN='" + token.AccessToken + "'",
-			"   export YOUTUBE_REFRESH_TOKEN='" + token.RefreshToken + "'",
-			"3. Restart your application to enable full YouTube API features",
-		},
+		"message":       "Authentication successful! YouTube tokens stored.",
 	})
 }
+
+// Status handles GET /api/youtube/oauth/status
+func (h *YouTubeAuthHandler) Status(ctx *gin.Context) {
+	// In production, check for tokens in DB/session for the current user
+	isAuthenticated := youtubeOAuthTokens.AccessToken != "" && youtubeOAuthTokens.RefreshToken != ""
+	ctx.JSON(http.StatusOK, gin.H{
+		"authenticated": isAuthenticated,
+	})
+}
+
+// TODO: Implement a proper /api/youtube/oauth/status endpoint
+// This should check if the current user/session has valid YouTube OAuth tokens (access + refresh)
+// and return a JSON response like { "authenticated": true/false }.
+// For now, only a demo in-memory check is used. Replace with real user/session storage.
 
 // generateRandomState generates a random state parameter for OAuth2
 func generateRandomState() string {

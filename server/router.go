@@ -45,6 +45,7 @@ func InitiateRouter(
 	if youtubeAuthHandler != nil {
 		router.GET("/auth/youtube", youtubeAuthHandler.GetAuthURL)
 		router.GET("/auth/youtube/callback", youtubeAuthHandler.HandleCallback)
+		api.GET("/youtube/oauth/status", youtubeAuthHandler.Status)
 	}
 	if facebookOAuthHandler != nil {
 		router.GET("/auth/facebook", facebookOAuthHandler.GetAuthURL)
