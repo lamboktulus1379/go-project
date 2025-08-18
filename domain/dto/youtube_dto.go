@@ -15,7 +15,8 @@ type YouTubeVideoListRequest struct {
 	Order           string `json:"order,omitempty"` // date, rating, relevance, title, videoCount, viewCount
 	PublishedAfter  string `json:"published_after,omitempty"`
 	PublishedBefore string `json:"published_before,omitempty"`
-	Q               string `json:"q,omitempty"` // search query
+	Q               string `json:"q,omitempty"`   // search query
+	All             bool   `json:"all,omitempty"` // when true, iterate all pages during sync
 }
 
 // YouTubeVideoUploadRequest represents request for video upload

@@ -198,25 +198,18 @@ func initDatabase(C *Config) {
 }
 
 func initApp(C *Config) {
-	// Default/fallback port: handle missing or string->int mismatch
+	// Port resolution order (env overrides config): APP_PORT -> PORT -> config -> default 10001
+	if v := os.Getenv("APP_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			C.App.Port = p
+		}
+	} else if v := os.Getenv("PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			C.App.Port = p
+		}
+	}
 	if C.App.Port == 0 {
-		// Try env overrides first
-		if v := os.Getenv("APP_PORT"); v != "" {
-			if p, err := strconv.Atoi(v); err == nil {
-				C.App.Port = p
-			}
-		}
-		if C.App.Port == 0 {
-			if v := os.Getenv("PORT"); v != "" {
-				if p, err := strconv.Atoi(v); err == nil {
-					C.App.Port = p
-				}
-			}
-		}
-		// Final fallback
-		if C.App.Port == 0 {
-			C.App.Port = 10001
-		}
+		C.App.Port = 10001
 	}
 	// Allow overriding TLS settings via env variables (both enable and disable)
 	if v := os.Getenv("TLS_ENABLED"); v != "" {

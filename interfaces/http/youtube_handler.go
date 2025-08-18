@@ -15,6 +15,7 @@ import (
 type IYouTubeHandler interface {
 	// Video operations
 	GetMyVideos(ctx *gin.Context)
+	SyncMyVideos(ctx *gin.Context)
 	GetVideoDetails(ctx *gin.Context)
 	UploadVideo(ctx *gin.Context)
 	UpdateVideo(ctx *gin.Context)
@@ -69,6 +70,19 @@ func (h *YouTubeHandler) GetMyVideos(ctx *gin.Context) {
 			req.MaxResults = val
 		}
 	}
+	// DB pagination support
+	page := 1
+	if p := ctx.Query("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+	pageSize := 0
+	if ps := ctx.Query("pageSize"); ps != "" {
+		if v, err := strconv.Atoi(ps); err == nil && v > 0 {
+			pageSize = v
+		}
+	}
 	pageToken := ctx.Query("page_token")
 	if pageToken == "" {
 		pageToken = ctx.Query("pageToken")
@@ -92,11 +106,31 @@ func (h *YouTubeHandler) GetMyVideos(ctx *gin.Context) {
 	}
 	req.ChannelID = channelID
 
-	response, err := h.youtubeUseCase.GetMyVideos(ctx.Request.Context(), req)
+	// Default to DB cache unless explicitly asking YouTube
+	source := ctx.Query("source")
+	if source == "youtube" {
+		response, err := h.youtubeUseCase.GetMyVideos(ctx.Request.Context(), req)
+		if err != nil {
+			// Provide fallback mock data so FE can still render something and display error
+			ctx.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "Failed to get videos",
+				"message": err.Error(),
+				"data": []gin.H{
+					{"id": "mock-error-1", "title": "YouTube fetch failed", "description": err.Error()},
+				},
+			})
+			return
+		}
+		ctx.JSON(http.StatusOK, gin.H{"success": true, "data": response})
+		return
+	}
+
+	// DB path
+	response, err := h.youtubeUseCase.ListVideosFromDB(ctx.Request.Context(), page, pageSize)
 	if err != nil {
 		// Provide fallback mock data so FE can still render something and display error
 		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to get videos",
+			"error":   "Failed to get videos from DB",
 			"message": err.Error(),
 			"data": []gin.H{
 				{"id": "mock-error-1", "title": "YouTube fetch failed", "description": err.Error()},
@@ -106,6 +140,30 @@ func (h *YouTubeHandler) GetMyVideos(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"success": true, "data": response})
+}
+
+// SyncMyVideos handles POST /api/youtube/sync
+func (h *YouTubeHandler) SyncMyVideos(ctx *gin.Context) {
+	req := &dto.YouTubeVideoListRequest{}
+	if maxResults := ctx.Query("max_results"); maxResults != "" {
+		if val, err := strconv.ParseInt(maxResults, 10, 64); err == nil {
+			req.MaxResults = val
+		}
+	}
+	// Optional: full sync across all pages
+	if all := ctx.Query("all"); all != "" {
+		req.All = strings.EqualFold(all, "true") || all == "1" || strings.EqualFold(all, "yes")
+	}
+	req.Order = ctx.Query("order")
+	count, err := h.youtubeUseCase.SyncMyVideos(ctx.Request.Context(), req)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to sync videos",
+			"message": err.Error(),
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"success": true, "synced": count})
 }
 
 // GetVideoDetails handles GET /api/youtube/videos/:videoId

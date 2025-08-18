@@ -113,6 +113,7 @@ func InitiateRouter(
 		{
 			// Video operations
 			youtube.GET("/videos", youtubeHandler.GetMyVideos)
+			youtube.POST("/sync", youtubeHandler.SyncMyVideos)
 			youtube.GET("/videos/:videoId", youtubeHandler.GetVideoDetails)
 			youtube.POST("/videos/upload", youtubeHandler.UploadVideo)
 			youtube.PATCH("/videos/:videoId", youtubeHandler.UpdateVideo)

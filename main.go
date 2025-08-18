@@ -178,10 +178,15 @@ func main() {
 		if err != nil {
 			logger.GetLogger().WithField("error", err).Warn("Failed to initialize YouTube client - YouTube features will be disabled")
 		} else {
-			// Initialize YouTube use case and handler (assign to outer variable)
-			youtubeUsecase := usecase.NewYouTubeUseCase(youtubeClient)
-			youtubeHandler = httpHandler.NewYouTubeHandler(youtubeUsecase)
-			logger.GetLogger().Info("YouTube API client initialized successfully; registering YouTube routes including PATCH /api/youtube/videos/:videoId")
+			// Ensure cache schema and attach cache repository
+			if err := persistence.EnsureYouTubeCacheSchema(psqlDb); err != nil {
+				logger.GetLogger().WithField("error", err).Error("failed ensuring youtube cache schema")
+			}
+			ytCache := persistence.NewYouTubeCacheRepository(psqlDb)
+			// Use helper constructor to avoid unsafe assertions
+			youtubeUC := usecase.NewYouTubeUseCaseWithCache(youtubeClient, ytCache)
+			youtubeHandler = httpHandler.NewYouTubeHandler(youtubeUC)
+			logger.GetLogger().Info("YouTube API client initialized successfully with DB cache; registering YouTube routes including PATCH /api/youtube/videos/:videoId")
 		}
 	} else {
 		logger.GetLogger().Info("YouTube API credentials not configured - YouTube features will be disabled (using mock data only; PATCH route will return 501 fallback)")

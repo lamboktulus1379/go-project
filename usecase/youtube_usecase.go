@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"my-project/domain/dto"
 	"my-project/domain/model"
 	"my-project/domain/repository"
@@ -12,10 +14,14 @@ import (
 type IYouTubeUseCase interface {
 	// Video operations
 	GetMyVideos(ctx context.Context, req *dto.YouTubeVideoListRequest) (*dto.YouTubeVideoResponse, error)
+	// ListVideosFromDB returns videos from local DB cache (no YouTube calls)
+	ListVideosFromDB(ctx context.Context, page, pageSize int) (*dto.YouTubeVideoResponse, error)
 	GetVideoDetails(ctx context.Context, videoID string) (*model.YouTubeVideo, error)
 	UploadVideo(ctx context.Context, req *dto.YouTubeVideoUploadRequest) (*model.YouTubeVideo, error)
 	UpdateVideo(ctx context.Context, videoID string, req *dto.YouTubeVideoUpdateRequest) (*model.YouTubeVideo, error)
 	SearchVideos(ctx context.Context, req *dto.YouTubeSearchRequest) (*dto.YouTubeVideoResponse, error)
+	// SyncMyVideos pulls from YouTube and persists into DB cache, returns count
+	SyncMyVideos(ctx context.Context, req *dto.YouTubeVideoListRequest) (int, error)
 
 	// Comment operations
 	GetVideoComments(ctx context.Context, req *dto.YouTubeCommentListRequest) (*dto.YouTubeCommentResponse, error)
@@ -42,33 +48,36 @@ type IYouTubeUseCase interface {
 // YouTubeUseCase implements the YouTube use case operations
 type YouTubeUseCase struct {
 	youtubeRepo repository.IYouTube
+	cache       repository.IYouTubeCache // optional
 }
 
 // NewYouTubeUseCase creates a new YouTube use case instance
 func NewYouTubeUseCase(youtubeRepo repository.IYouTube) IYouTubeUseCase {
-	return &YouTubeUseCase{
-		youtubeRepo: youtubeRepo,
-	}
+	return &YouTubeUseCase{youtubeRepo: youtubeRepo}
+}
+
+// NewYouTubeUseCaseWithCache creates a new YouTube use case with cache configured
+func NewYouTubeUseCaseWithCache(youtubeRepo repository.IYouTube, cache repository.IYouTubeCache) IYouTubeUseCase {
+	return (&YouTubeUseCase{youtubeRepo: youtubeRepo}).WithCache(cache)
+}
+
+// WithCache enables cache on the use case (fluent)
+func (u *YouTubeUseCase) WithCache(cache repository.IYouTubeCache) *YouTubeUseCase {
+	u.cache = cache
+	return u
 }
 
 // GetMyVideos retrieves videos from the authenticated user's channel
 func (u *YouTubeUseCase) GetMyVideos(ctx context.Context, req *dto.YouTubeVideoListRequest) (*dto.YouTubeVideoResponse, error) {
 	if req == nil {
-		req = &dto.YouTubeVideoListRequest{
-			MaxResults: 25,
-			Order:      "date",
-		}
+		req = &dto.YouTubeVideoListRequest{MaxResults: 25, Order: "date"}
 	}
-
-	// Set default values if not provided
 	if req.MaxResults == 0 {
 		req.MaxResults = 25
 	}
 	if req.Order == "" {
 		req.Order = "date"
 	}
-
-	// Validate max results limit
 	if req.MaxResults > 50 {
 		req.MaxResults = 50
 	}
@@ -77,14 +86,52 @@ func (u *YouTubeUseCase) GetMyVideos(ctx context.Context, req *dto.YouTubeVideoL
 	if err != nil {
 		return nil, fmt.Errorf("failed to get my videos: %w", err)
 	}
-
 	return response, nil
 }
 
-// GetVideoDetails retrieves details for a specific video
+// ListVideosFromDB returns videos from DB cache only
+func (u *YouTubeUseCase) ListVideosFromDB(ctx context.Context, page, pageSize int) (*dto.YouTubeVideoResponse, error) {
+	if u.cache == nil {
+		return nil, fmt.Errorf("cache repository not configured")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 25
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	offset := (page - 1) * pageSize
+	items, total, err := u.cache.ListVideos(ctx, pageSize, offset)
+	if err != nil {
+		return nil, err
+	}
+	// Convert []YouTubeVideo to []interface{}
+	arr := make([]interface{}, len(items))
+	for i := range items {
+		arr[i] = items[i]
+	}
+	return &dto.YouTubeVideoResponse{
+		YouTubeResponse: dto.YouTubeResponse{
+			Kind:     "local#youtubeVideoList",
+			PageInfo: dto.PageInfo{TotalResults: total, ResultsPerPage: int64(pageSize)},
+		},
+		Items: arr,
+	}, nil
+}
+
+// GetVideoDetails retrieves details for a specific video (cache-aside)
 func (u *YouTubeUseCase) GetVideoDetails(ctx context.Context, videoID string) (*model.YouTubeVideo, error) {
 	if videoID == "" {
 		return nil, fmt.Errorf("video ID is required")
+	}
+
+	if u.cache != nil {
+		if v, _, err := u.cache.GetVideo(ctx, videoID); err == nil && v != nil {
+			return v, nil
+		}
 	}
 
 	video, err := u.youtubeRepo.GetVideoDetails(ctx, videoID)
@@ -92,7 +139,88 @@ func (u *YouTubeUseCase) GetVideoDetails(ctx context.Context, videoID string) (*
 		return nil, fmt.Errorf("failed to get video details: %w", err)
 	}
 
+	if u.cache != nil && video != nil {
+		_ = u.cache.UpsertVideo(ctx, videoID, video, nil, 10*time.Minute)
+	}
 	return video, nil
+}
+
+// SyncMyVideos fetches from YouTube and persists to DB cache (cache-aside warmup)
+func (u *YouTubeUseCase) SyncMyVideos(ctx context.Context, req *dto.YouTubeVideoListRequest) (int, error) {
+	if u.youtubeRepo == nil || u.cache == nil {
+		return 0, fmt.Errorf("sync requires both youtube client and cache configured")
+	}
+	if req == nil {
+		req = &dto.YouTubeVideoListRequest{MaxResults: 50, Order: "date"}
+	}
+	if req.MaxResults == 0 {
+		req.MaxResults = 50
+	}
+	if req.MaxResults > 50 {
+		req.MaxResults = 50
+	}
+	// Helper to adapt interface slice to concrete []model.YouTubeVideo
+	adapt := func(items []interface{}) []model.YouTubeVideo {
+		vids := make([]model.YouTubeVideo, 0, len(items))
+		for _, it := range items {
+			switch v := it.(type) {
+			case model.YouTubeVideo:
+				vids = append(vids, v)
+			case *model.YouTubeVideo:
+				vids = append(vids, *v)
+			case map[string]interface{}:
+				// skip mock rows
+			default:
+				// unknown type; skip
+			}
+		}
+		return vids
+	}
+
+	// If full sync requested, iterate all pages
+	if req.All {
+		total := 0
+		pageToken := req.PageToken
+		// hard stop to avoid infinite loops
+		for page := 0; page < 1000; page++ { // ~50k items max at 50/page
+			local := *req
+			local.PageToken = pageToken
+			resp, err := u.youtubeRepo.GetMyVideos(ctx, &local)
+			if err != nil {
+				return total, err
+			}
+			// Nothing returned -> done
+			if resp == nil || len(resp.Items) == 0 {
+				break
+			}
+			videos := adapt(resp.Items)
+			if len(videos) > 0 {
+				if err := u.cache.UpsertVideos(ctx, videos, nil, 24*time.Hour); err != nil {
+					return total, err
+				}
+				total += len(videos)
+			}
+			if resp.NextPageToken == "" || resp.NextPageToken == pageToken {
+				break
+			}
+			pageToken = resp.NextPageToken
+		}
+		return total, nil
+	}
+
+	// Single page sync (default)
+	resp, err := u.youtubeRepo.GetMyVideos(ctx, req)
+	if err != nil {
+		return 0, err
+	}
+	videos := adapt(resp.Items)
+	if len(videos) == 0 {
+		return 0, nil
+	}
+	if err := u.cache.UpsertVideos(ctx, videos, nil, 24*time.Hour); err != nil {
+		return 0, err
+	}
+	return len(videos), nil
 }
 
 // UploadVideo uploads a video to YouTube
@@ -100,27 +228,17 @@ func (u *YouTubeUseCase) UploadVideo(ctx context.Context, req *dto.YouTubeVideoU
 	if req == nil {
 		return nil, fmt.Errorf("upload request is required")
 	}
-
 	if req.Title == "" {
 		return nil, fmt.Errorf("video title is required")
 	}
-
 	if req.File == nil {
 		return nil, fmt.Errorf("video file is required")
 	}
-
-	// Set default privacy if not provided
 	if req.Privacy == "" {
 		req.Privacy = "private"
 	}
-
-	// Validate privacy setting
-	validPrivacySettings := map[string]bool{
-		"private":  true,
-		"public":   true,
-		"unlisted": true,
-	}
-	if !validPrivacySettings[req.Privacy] {
+	validPrivacy := map[string]bool{"private": true, "public": true, "unlisted": true}
+	if !validPrivacy[req.Privacy] {
 		return nil, fmt.Errorf("invalid privacy setting: %s", req.Privacy)
 	}
 
@@ -128,7 +246,6 @@ func (u *YouTubeUseCase) UploadVideo(ctx context.Context, req *dto.YouTubeVideoU
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload video: %w", err)
 	}
-
 	return video, nil
 }
 
@@ -141,7 +258,6 @@ func (u *YouTubeUseCase) UpdateVideo(ctx context.Context, videoID string, req *d
 		return nil, fmt.Errorf("update request is required")
 	}
 
-	// Build updates map only with provided fields
 	updates := make(map[string]interface{})
 	if req.Title != nil {
 		updates["title"] = *req.Title
@@ -154,8 +270,8 @@ func (u *YouTubeUseCase) UpdateVideo(ctx context.Context, videoID string, req *d
 	}
 	if req.Privacy != nil {
 		p := *req.Privacy
-		validPrivacySettings := map[string]bool{"private": true, "public": true, "unlisted": true}
-		if !validPrivacySettings[p] {
+		validPrivacy := map[string]bool{"private": true, "public": true, "unlisted": true}
+		if !validPrivacy[p] {
 			return nil, fmt.Errorf("invalid privacy setting: %s", p)
 		}
 		updates["privacy"] = p
@@ -179,8 +295,6 @@ func (u *YouTubeUseCase) SearchVideos(ctx context.Context, req *dto.YouTubeSearc
 	if req == nil || req.Q == "" {
 		return nil, fmt.Errorf("search query is required")
 	}
-
-	// Set default values
 	if req.MaxResults == 0 {
 		req.MaxResults = 25
 	}
@@ -190,8 +304,6 @@ func (u *YouTubeUseCase) SearchVideos(ctx context.Context, req *dto.YouTubeSearc
 	if req.Type == "" {
 		req.Type = "video"
 	}
-
-	// Validate max results limit
 	if req.MaxResults > 50 {
 		req.MaxResults = 50
 	}
@@ -200,7 +312,6 @@ func (u *YouTubeUseCase) SearchVideos(ctx context.Context, req *dto.YouTubeSearc
 	if err != nil {
 		return nil, fmt.Errorf("failed to search videos: %w", err)
 	}
-
 	return response, nil
 }
 
@@ -209,16 +320,12 @@ func (u *YouTubeUseCase) GetVideoComments(ctx context.Context, req *dto.YouTubeC
 	if req == nil || req.VideoID == "" {
 		return nil, fmt.Errorf("video ID is required")
 	}
-
-	// Set default values
 	if req.MaxResults == 0 {
 		req.MaxResults = 20
 	}
 	if req.Order == "" {
 		req.Order = "time"
 	}
-
-	// Validate max results limit
 	if req.MaxResults > 100 {
 		req.MaxResults = 100
 	}
@@ -227,7 +334,6 @@ func (u *YouTubeUseCase) GetVideoComments(ctx context.Context, req *dto.YouTubeC
 	if err != nil {
 		return nil, fmt.Errorf("failed to get video comments: %w", err)
 	}
-
 	return response, nil
 }
 
@@ -236,16 +342,12 @@ func (u *YouTubeUseCase) AddComment(ctx context.Context, req *dto.YouTubeComment
 	if req == nil {
 		return nil, fmt.Errorf("comment request is required")
 	}
-
 	if req.VideoID == "" {
 		return nil, fmt.Errorf("video ID is required")
 	}
-
 	if req.Text == "" {
 		return nil, fmt.Errorf("comment text is required")
 	}
-
-	// Validate comment length
 	if len(req.Text) > 10000 {
 		return nil, fmt.Errorf("comment text too long (max 10000 characters)")
 	}
@@ -254,7 +356,6 @@ func (u *YouTubeUseCase) AddComment(ctx context.Context, req *dto.YouTubeComment
 	if err != nil {
 		return nil, fmt.Errorf("failed to add comment: %w", err)
 	}
-
 	return comment, nil
 }
 
@@ -263,16 +364,12 @@ func (u *YouTubeUseCase) UpdateComment(ctx context.Context, req *dto.YouTubeComm
 	if req == nil {
 		return nil, fmt.Errorf("comment update request is required")
 	}
-
 	if req.CommentID == "" {
 		return nil, fmt.Errorf("comment ID is required")
 	}
-
 	if req.Text == "" {
 		return nil, fmt.Errorf("comment text is required")
 	}
-
-	// Validate comment length
 	if len(req.Text) > 10000 {
 		return nil, fmt.Errorf("comment text too long (max 10000 characters)")
 	}
@@ -281,7 +378,6 @@ func (u *YouTubeUseCase) UpdateComment(ctx context.Context, req *dto.YouTubeComm
 	if err != nil {
 		return nil, fmt.Errorf("failed to update comment: %w", err)
 	}
-
 	return comment, nil
 }
 
@@ -290,12 +386,9 @@ func (u *YouTubeUseCase) DeleteComment(ctx context.Context, commentID string) er
 	if commentID == "" {
 		return fmt.Errorf("comment ID is required")
 	}
-
-	err := u.youtubeRepo.DeleteComment(ctx, commentID)
-	if err != nil {
+	if err := u.youtubeRepo.DeleteComment(ctx, commentID); err != nil {
 		return fmt.Errorf("failed to delete comment: %w", err)
 	}
-
 	return nil
 }
 
@@ -304,12 +397,9 @@ func (u *YouTubeUseCase) LikeVideo(ctx context.Context, videoID string) error {
 	if videoID == "" {
 		return fmt.Errorf("video ID is required")
 	}
-
-	err := u.youtubeRepo.LikeVideo(ctx, videoID)
-	if err != nil {
+	if err := u.youtubeRepo.LikeVideo(ctx, videoID); err != nil {
 		return fmt.Errorf("failed to like video: %w", err)
 	}
-
 	return nil
 }
 
@@ -318,12 +408,9 @@ func (u *YouTubeUseCase) DislikeVideo(ctx context.Context, videoID string) error
 	if videoID == "" {
 		return fmt.Errorf("video ID is required")
 	}
-
-	err := u.youtubeRepo.DislikeVideo(ctx, videoID)
-	if err != nil {
+	if err := u.youtubeRepo.DislikeVideo(ctx, videoID); err != nil {
 		return fmt.Errorf("failed to dislike video: %w", err)
 	}
-
 	return nil
 }
 
@@ -332,16 +419,13 @@ func (u *YouTubeUseCase) RemoveVideoRating(ctx context.Context, videoID string) 
 	if videoID == "" {
 		return fmt.Errorf("video ID is required")
 	}
-
-	err := u.youtubeRepo.RemoveVideoRating(ctx, videoID)
-	if err != nil {
+	if err := u.youtubeRepo.RemoveVideoRating(ctx, videoID); err != nil {
 		return fmt.Errorf("failed to remove video rating: %w", err)
 	}
-
 	return nil
 }
 
-// ToggleCommentLike toggles like state (in-memory) for a user's comment
+// ToggleCommentLike toggles like state for a user's comment (local)
 func (u *YouTubeUseCase) ToggleCommentLike(ctx context.Context, userID, commentID string) (bool, error) {
 	if userID == "" || commentID == "" {
 		return false, fmt.Errorf("userID and commentID are required")
@@ -353,7 +437,7 @@ func (u *YouTubeUseCase) ToggleCommentLike(ctx context.Context, userID, commentI
 	return liked, nil
 }
 
-// ToggleCommentHeart toggles heart state (in-memory) for a user's comment
+// ToggleCommentHeart toggles heart state for a user's comment (local)
 func (u *YouTubeUseCase) ToggleCommentHeart(ctx context.Context, userID, commentID string) (bool, error) {
 	if userID == "" || commentID == "" {
 		return false, fmt.Errorf("userID and commentID are required")
@@ -371,7 +455,6 @@ func (u *YouTubeUseCase) GetMyChannel(ctx context.Context) (*model.YouTubeChanne
 	if err != nil {
 		return nil, fmt.Errorf("failed to get my channel: %w", err)
 	}
-
 	return channel, nil
 }
 
@@ -380,12 +463,10 @@ func (u *YouTubeUseCase) GetChannelDetails(ctx context.Context, channelID string
 	if channelID == "" {
 		return nil, fmt.Errorf("channel ID is required")
 	}
-
 	channel, err := u.youtubeRepo.GetChannelDetails(ctx, channelID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get channel details: %w", err)
 	}
-
 	return channel, nil
 }
 
@@ -395,7 +476,6 @@ func (u *YouTubeUseCase) GetMyPlaylists(ctx context.Context) ([]model.YouTubePla
 	if err != nil {
 		return nil, fmt.Errorf("failed to get my playlists: %w", err)
 	}
-
 	return playlists, nil
 }
 
@@ -404,26 +484,16 @@ func (u *YouTubeUseCase) CreatePlaylist(ctx context.Context, title, description,
 	if title == "" {
 		return nil, fmt.Errorf("playlist title is required")
 	}
-
-	// Set default privacy if not provided
 	if privacy == "" {
 		privacy = "private"
 	}
-
-	// Validate privacy setting
-	validPrivacySettings := map[string]bool{
-		"private":  true,
-		"public":   true,
-		"unlisted": true,
-	}
-	if !validPrivacySettings[privacy] {
+	validPrivacy := map[string]bool{"private": true, "public": true, "unlisted": true}
+	if !validPrivacy[privacy] {
 		return nil, fmt.Errorf("invalid privacy setting: %s", privacy)
 	}
-
 	playlist, err := u.youtubeRepo.CreatePlaylist(ctx, title, description, privacy)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create playlist: %w", err)
 	}
-
 	return playlist, nil
 }
