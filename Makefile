@@ -80,13 +80,10 @@ run:
 .PHONY: run-https
 run-https:
 	@mkdir -p certs
-	# Load environment variables from config.env if present
-	@if [ -f config.env ]; then \
-		echo "Loading environment from config.env" ; \
-		set -a ; . ./config.env ; set +a ; \
-	fi ; \
-	# Prefer user-provided localhost cert/key
-	@if [ -f certs/localhost.crt ] && [ -f certs/localhost.key ]; then \
+	set -a ; \
+	[ -f config.env ] && . ./config.env ; \
+	set +a ; \
+	if [ -f certs/localhost.crt ] && [ -f certs/localhost.key ]; then \
 		CERT_FILE=$$(pwd)/certs/localhost.crt ; \
 		KEY_FILE=$$(pwd)/certs/localhost.key ; \
 		echo "Using provided certs: $$CERT_FILE $$KEY_FILE" ; \
@@ -106,14 +103,13 @@ run-https:
 		CERT_FILE=$$(pwd)/certs/dev.localhost.crt ; \
 		KEY_FILE=$$(pwd)/certs/dev.localhost.key ; \
 	fi ; \
-	# Default HTTPS callback URLs
-	YOUTUBE_REDIRECT_URL=$${YOUTUBE_REDIRECT_URL:-https://localhost:10001/auth/youtube/callback} ; \
-	FACEBOOK_REDIRECT_URL=$${FACEBOOK_REDIRECT_URL:-https://localhost:10001/auth/facebook/callback} ; \
+	echo " Access Token: $$YOUTUBE_ACCESS_TOKEN" ; \
+	echo " Refresh Token: $$YOUTUBE_REFRESH_TOKEN" ; \
 	echo "Starting server with TLS using $$CERT_FILE" ; \
 	echo "  YouTube redirect : $$YOUTUBE_REDIRECT_URL" ; \
 	echo "  Facebook redirect: $$FACEBOOK_REDIRECT_URL" ; \
-	TLS_ENABLED=1 TLS_CERT_FILE=$$CERT_FILE TLS_KEY_FILE=$$KEY_FILE \
-	YOUTUBE_REDIRECT_URL=$$YOUTUBE_REDIRECT_URL FACEBOOK_REDIRECT_URL=$$FACEBOOK_REDIRECT_URL \
+	export TLS_ENABLED=1 TLS_CERT_FILE=$$CERT_FILE TLS_KEY_FILE=$$KEY_FILE ; \
+	export YOUTUBE_REDIRECT_URL FACEBOOK_REDIRECT_URL ; \
 	go run main.go
 
 .PHONY: tidy
