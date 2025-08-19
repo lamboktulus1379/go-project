@@ -41,7 +41,10 @@ func EnsureYouTubeCacheSchema(db *sql.DB) error {
 // YouTubeCacheRepository implements repository for caching video metadata
 // Stored as JSONB for flexibility without strict relational mapping
 
-type YouTubeCacheRepository struct{ db *sql.DB }
+// YouTubeCacheRepository provides caching for YouTube video metadata.
+type YouTubeCacheRepository struct {
+	db *sql.DB // Database connection for cache table
+}
 
 func NewYouTubeCacheRepository(db *sql.DB) *YouTubeCacheRepository {
 	return &YouTubeCacheRepository{db: db}

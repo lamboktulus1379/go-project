@@ -176,7 +176,9 @@ func (h *YouTubeHandler) GetVideoDetails(ctx *gin.Context) {
 		return
 	}
 
-	video, err := h.youtubeUseCase.GetVideoDetails(ctx.Request.Context(), videoID)
+	forceSync := ctx.Query("forceSync") == "true"
+
+	video, err := h.youtubeUseCase.GetVideoDetailsWithSync(ctx.Request.Context(), videoID, forceSync)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to get video details",

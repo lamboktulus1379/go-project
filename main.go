@@ -183,10 +183,14 @@ func main() {
 				logger.GetLogger().WithField("error", err).Error("failed ensuring youtube cache schema")
 			}
 			ytCache := persistence.NewYouTubeCacheRepository(psqlDb)
-			// Use helper constructor to avoid unsafe assertions
-			youtubeUC := usecase.NewYouTubeUseCaseWithCache(youtubeClient, ytCache)
+			// Create YouTubeRepository that combines API client and cache
+			youtubeRepo := &persistence.YouTubeRepository{
+				CacheRepo:        ytCache,
+				YouTubeAPIClient: youtubeClient,
+			}
+			youtubeUC := usecase.NewYouTubeUseCaseWithCache(youtubeRepo, ytCache)
 			youtubeHandler = httpHandler.NewYouTubeHandler(youtubeUC)
-			logger.GetLogger().Info("YouTube API client initialized successfully with DB cache; registering YouTube routes including PATCH /api/youtube/videos/:videoId")
+			logger.GetLogger().Info("YouTubeRepository initialized successfully with API client and DB cache; registering YouTube routes including PATCH /api/youtube/videos/:videoId")
 		}
 	} else {
 		logger.GetLogger().Info("YouTube API credentials not configured - YouTube features will be disabled (using mock data only; PATCH route will return 501 fallback)")

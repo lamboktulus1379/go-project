@@ -10,6 +10,28 @@ import (
 	"my-project/domain/repository"
 )
 
+// GetVideoDetailsWithSync fetches from YouTube API if forceSync is true, else uses cache-aside
+func (u *YouTubeUseCase) GetVideoDetailsWithSync(ctx context.Context, videoID string, forceSync bool) (*model.YouTubeVideo, error) {
+	if videoID == "" {
+		return nil, fmt.Errorf("video ID is required")
+	}
+
+	if forceSync {
+		// Always fetch from YouTube API, update DB/cache, and return
+		video, err := u.youtubeRepo.FetchAndUpdateFromYouTube(ctx, videoID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to sync video from YouTube: %w", err)
+		}
+		if u.cache != nil && video != nil {
+			_ = u.cache.UpsertVideo(ctx, videoID, video, nil, 10*time.Minute)
+		}
+		return video, nil
+	}
+
+	// Default: cache-aside logic
+	return u.GetVideoDetails(ctx, videoID)
+}
+
 // IYouTubeUseCase defines the interface for YouTube use case operations
 type IYouTubeUseCase interface {
 	// Video operations
@@ -43,6 +65,8 @@ type IYouTubeUseCase interface {
 	// Playlist operations
 	GetMyPlaylists(ctx context.Context) ([]model.YouTubePlaylist, error)
 	CreatePlaylist(ctx context.Context, title, description, privacy string) (*model.YouTubePlaylist, error)
+
+	GetVideoDetailsWithSync(ctx context.Context, videoID string, forceSync bool) (*model.YouTubeVideo, error)
 }
 
 // YouTubeUseCase implements the YouTube use case operations

@@ -15,6 +15,9 @@ type IYouTube interface {
 	UpdateVideo(ctx context.Context, videoID string, updates map[string]interface{}) (*model.YouTubeVideo, error)
 	DeleteVideo(ctx context.Context, videoID string) error
 
+	// Fetches latest video from YouTube API, updates DB, and returns it
+	FetchAndUpdateFromYouTube(ctx context.Context, videoID string) (*model.YouTubeVideo, error)
+
 	// Search operations
 	SearchVideos(ctx context.Context, req *dto.YouTubeSearchRequest) (*dto.YouTubeVideoResponse, error)
 

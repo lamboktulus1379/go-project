@@ -32,6 +32,11 @@ type Client struct {
 	commentHearts map[string]map[string]bool
 }
 
+// FetchAndUpdateFromYouTube is not supported in the API client; use repository for DB/cache update
+func (c *Client) FetchAndUpdateFromYouTube(ctx context.Context, videoID string) (*model.YouTubeVideo, error) {
+	return nil, errors.New("FetchAndUpdateFromYouTube is not implemented in the API client; use the repository layer")
+}
+
 // keys returns the map's keys as a slice of strings for logging
 func keys(m map[string]interface{}) []string {
 	out := make([]string, 0, len(m))
