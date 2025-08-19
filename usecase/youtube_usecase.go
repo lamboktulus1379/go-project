@@ -307,11 +307,18 @@ func (u *YouTubeUseCase) UpdateVideo(ctx context.Context, videoID string, req *d
 		return nil, fmt.Errorf("no fields provided to update")
 	}
 
-	video, err := u.youtubeRepo.UpdateVideo(ctx, videoID, updates)
+	// Update video on YouTube
+	_, err := u.youtubeRepo.UpdateVideo(ctx, videoID, updates)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update video: %w", err)
 	}
-	return video, nil
+
+	// Immediately fetch latest data from YouTube and sync to DB/cache
+	fresh, err := u.youtubeRepo.FetchAndUpdateFromYouTube(ctx, videoID)
+	if err != nil {
+		return nil, fmt.Errorf("video updated but failed to sync latest data: %w", err)
+	}
+	return fresh, nil
 }
 
 // SearchVideos searches for videos on YouTube
