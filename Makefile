@@ -23,9 +23,15 @@ help:
 	echo "  build                Compile Go server" ; \
 	echo "  run                  Run server (dev)" ; \
 	@echo "  run-https            Run server over HTTPS with local self-signed cert" ; \
+	echo "  run-https-10010     Run server over HTTPS on port 10010" ; \
+	echo "  run-http-10001      Run server over HTTP on port 10001" ; \
 	echo "  tidy                 Go mod tidy" ; \
 	echo "  test                 Run Go tests" ; \
 	echo "Environment overrides: LB=<path to liquibase> COUNT=<n>" ;
+	@echo "  deploy               Build and deploy to remote via deploy/deploy.sh" ; \
+	echo "    Variables: SSH_HOST, SSH_USER, SSH_PORT, DOMAIN, CERTBOT=0|1, CERTBOT_EMAIL" ;
+	echo "  deploy-mac           Local HTTPS via Homebrew Nginx + mkcert (domain maps to 127.0.0.1)" ; \
+	echo "    Variables: DOMAIN (default: gra.tulus.tech), APP_PORT (default: 10010)" ;
 
 ## -----------------
 ## PostgreSQL Targets
@@ -108,8 +114,22 @@ run-https:
 	echo "Starting server with TLS using $$CERT_FILE" ; \
 	echo "  YouTube redirect : $$YOUTUBE_REDIRECT_URL" ; \
 	echo "  Facebook redirect: $$FACEBOOK_REDIRECT_URL" ; \
+	[ -n "$(APP_PORT)" ] && export APP_PORT=$(APP_PORT) ; \
 	export TLS_ENABLED=1 TLS_CERT_FILE=$$CERT_FILE TLS_KEY_FILE=$$KEY_FILE ; \
 	export YOUTUBE_REDIRECT_URL FACEBOOK_REDIRECT_URL ; \
+	go run main.go
+
+.PHONY: run-https-10010
+run-https-10010:
+	@$(MAKE) run-https APP_PORT=10010
+
+.PHONY: run-http-10001
+run-http-10001:
+	@set -a ; \
+	[ -f config.env ] && . ./config.env ; \
+	set +a ; \
+	echo "Starting server over HTTP on port 10001" ; \
+	export TLS_ENABLED=0 APP_PORT=10001 ; \
 	go run main.go
 
 .PHONY: tidy
@@ -119,3 +139,11 @@ tidy:
 .PHONY: test
 test:
 	go test ./... -count=1
+
+.PHONY: deploy
+deploy:
+	@bash deploy/deploy.sh
+
+.PHONY: deploy-mac
+deploy-mac:
+	@bash deploy/mac/deploy-local-mac.sh

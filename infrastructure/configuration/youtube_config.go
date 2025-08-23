@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -19,11 +20,17 @@ type YouTubeConfig struct {
 
 // GetYouTubeConfig returns YouTube configuration from JSON config with environment variable fallback
 func GetYouTubeConfig() (*YouTubeConfig, error) {
-	// Prefer https redirect locally if TLS is enabled, else http fallback
-	defaultRedirect := "http://localhost:10001/auth/youtube/callback"
+	// Prefer https redirect locally if TLS is enabled, else http fallback,
+	// and honor the configured application port.
+	scheme := "http"
 	if C.App.TLSEnabled {
-		defaultRedirect = "https://localhost:10001/auth/youtube/callback"
+		scheme = "https"
 	}
+	port := C.App.Port
+	if port == 0 {
+		port = 10001
+	}
+	defaultRedirect := fmt.Sprintf("%s://localhost:%d/auth/youtube/callback", scheme, port)
 	config := &YouTubeConfig{
 		ClientID:     getConfigValue(C.YouTube.ClientID, "YOUTUBE_CLIENT_ID", ""),
 		ClientSecret: getConfigValue(C.YouTube.ClientSecret, "YOUTUBE_CLIENT_SECRET", ""),

@@ -52,8 +52,13 @@ service-account-*.json
 *.p12
 
 # Log
-logs
+logs/
 *.csv
+
+# Temporary deployment files
+/tmp/go-app*.log
+/tmp/go-app*.pid
+*.pid
 
 tmp/*
 
@@ -67,9 +72,18 @@ issues
 *.iws
 *.ipr
 
-# Test scripts
+# Test scripts and other shell scripts
 test_*.sh
-*.sh
+start-*.sh
+stop-*.sh
+setup-*.sh
+run_*.sh
+build.sh
+
+# Keep deployment scripts
+!deploy-nginx.sh
+!service.sh
+!quick-deploy.sh
 
 # Compiled binaries
 youtube-api
