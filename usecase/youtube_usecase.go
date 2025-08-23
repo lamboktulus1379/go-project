@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"my-project/domain/dto"
@@ -67,6 +68,9 @@ type IYouTubeUseCase interface {
 	CreatePlaylist(ctx context.Context, title, description, privacy string) (*model.YouTubePlaylist, error)
 
 	GetVideoDetailsWithSync(ctx context.Context, videoID string, forceSync bool) (*model.YouTubeVideo, error)
+
+	// DashboardSummary aggregates metrics for admin dashboard from cache (fast, no API calls)
+	DashboardSummary(ctx context.Context) (*dto.YouTubeDashboardSummary, error)
 }
 
 // YouTubeUseCase implements the YouTube use case operations
@@ -527,4 +531,92 @@ func (u *YouTubeUseCase) CreatePlaylist(ctx context.Context, title, description,
 		return nil, fmt.Errorf("failed to create playlist: %w", err)
 	}
 	return playlist, nil
+}
+
+// DashboardSummary computes aggregated stats from cached videos
+func (u *YouTubeUseCase) DashboardSummary(ctx context.Context) (*dto.YouTubeDashboardSummary, error) {
+	if u.cache == nil {
+		return nil, fmt.Errorf("cache repository not configured")
+	}
+	// Pull first 500 cached videos (5 pages of 100) for aggregation
+	var all []model.YouTubeVideo
+	var total int64
+	pageSize := 100
+	for page := 0; page < 5; page++ {
+		items, tot, err := u.cache.ListVideos(ctx, pageSize, page*pageSize)
+		if err != nil {
+			return nil, err
+		}
+		if page == 0 {
+			total = tot
+		}
+		if len(items) == 0 {
+			break
+		}
+		all = append(all, items...)
+		if len(all) >= 500 || int64(len(all)) >= total {
+			break
+		}
+	}
+	// Compute aggregates
+	var views int64
+	var likes int64
+	recent := 0
+	now := time.Now()
+	thirtyDays := 30 * 24 * time.Hour
+	// month -> count map for last 6 months
+	months := make([]string, 0, 6)
+	counts := make(map[string]int)
+	for i := 5; i >= 0; i-- {
+		d := time.Date(now.Year(), now.Month()-time.Month(i), 1, 0, 0, 0, 0, time.UTC)
+		key := fmt.Sprintf("%04d-%02d", d.Year(), int(d.Month()))
+		months = append(months, key)
+		counts[key] = 0
+	}
+
+	tops := make([]dto.YouTubeDashboardTopVideo, 0, len(all))
+	for i := range all {
+		v := all[i]
+		views += v.ViewCount
+		likes += v.LikeCount
+		if now.Sub(v.PublishedAt) <= thirtyDays {
+			recent++
+		}
+		key := fmt.Sprintf("%04d-%02d", v.PublishedAt.Year(), int(v.PublishedAt.Month()))
+		if _, ok := counts[key]; ok {
+			counts[key]++
+		}
+		thumb := v.Thumbnails.Medium.URL
+		if thumb == "" {
+			thumb = v.Thumbnails.Default.URL
+		}
+		tops = append(tops, dto.YouTubeDashboardTopVideo{
+			ID:          v.ID,
+			Title:       v.Title,
+			Views:       v.ViewCount,
+			Thumbnail:   thumb,
+			PublishedAt: v.PublishedAt.Format(time.RFC3339),
+		})
+	}
+	// Top 5 by views
+	sort.Slice(tops, func(i, j int) bool { return tops[i].Views > tops[j].Views })
+	if len(tops) > 5 {
+		tops = tops[:5]
+	}
+	monthly := make([]dto.YouTubeMonthlyUpload, 0, len(months))
+	for _, m := range months {
+		monthly = append(monthly, dto.YouTubeMonthlyUpload{Month: m, Count: counts[m]})
+	}
+	avgLikes := 0.0
+	if n := len(all); n > 0 {
+		avgLikes = float64(likes) / float64(n)
+	}
+	return &dto.YouTubeDashboardSummary{
+		TotalVideos:   total,
+		TotalViews:    views,
+		AvgLikes:      avgLikes,
+		RecentUploads: recent,
+		Monthly:       monthly,
+		TopVideos:     tops,
+	}, nil
 }

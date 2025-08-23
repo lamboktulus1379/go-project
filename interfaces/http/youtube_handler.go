@@ -42,6 +42,9 @@ type IYouTubeHandler interface {
 	// Playlist operations
 	GetMyPlaylists(ctx *gin.Context)
 	CreatePlaylist(ctx *gin.Context)
+
+	// Dashboard summary
+	GetDashboardSummary(ctx *gin.Context)
 }
 
 // YouTubeHandler implements the YouTube HTTP handlers
@@ -651,6 +654,19 @@ func (h *YouTubeHandler) CreatePlaylist(ctx *gin.Context) {
 		"success": true,
 		"data":    playlist,
 	})
+}
+
+// GetDashboardSummary handles GET /api/youtube/summary
+func (h *YouTubeHandler) GetDashboardSummary(ctx *gin.Context) {
+	summary, err := h.youtubeUseCase.DashboardSummary(ctx.Request.Context())
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "Failed to get dashboard summary",
+			"message": err.Error(),
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"success": true, "data": summary})
 }
 
 // (duplicate toggle handlers removed)

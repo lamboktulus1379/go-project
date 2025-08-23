@@ -86,9 +86,67 @@ run:
 .PHONY: run-https
 run-https:
 	@mkdir -p certs
-	set -a ; \
+	@set -a ; \
 	[ -f config.env ] && . ./config.env ; \
 	set +a ; \
+	TARGET_PORT=$${APP_PORT:-10001} ; \
+	echo "Checking port availability for $$TARGET_PORT..." ; \
+	INUSE_PIDS=$$(lsof -ti tcp:$$TARGET_PORT 2>/dev/null || true) ; \
+	if [ -n "$$INUSE_PIDS" ]; then \
+	  echo "⚠️  Port $$TARGET_PORT is already in use by PID(s): $$INUSE_PIDS" ; \
+	  while true; do \
+	    echo "" ; \
+	    read -p "Choose action: [k]ill existing process / [n]ew port / [a]bort: " choice ; \
+	    case "$$choice" in \
+	      k|K|kill) \
+	        echo "🔄 Attempting to kill process(es) $$INUSE_PIDS..." ; \
+	        kill $$INUSE_PIDS 2>/dev/null || true ; \
+	        sleep 2 ; \
+	        REMAIN=$$(lsof -ti tcp:$$TARGET_PORT 2>/dev/null || true) ; \
+	        if [ -n "$$REMAIN" ]; then \
+	          echo "🔥 Force killing remaining process(es) $$REMAIN..." ; \
+	          kill -9 $$REMAIN 2>/dev/null || true ; \
+	          sleep 1 ; \
+	        fi ; \
+	        FINAL_CHECK=$$(lsof -ti tcp:$$TARGET_PORT 2>/dev/null || true) ; \
+	        if [ -z "$$FINAL_CHECK" ]; then \
+	          echo "✅ Port $$TARGET_PORT is now free" ; \
+	          APP_PORT=$$TARGET_PORT ; export APP_PORT ; \
+	          break ; \
+	        else \
+	          echo "❌ Failed to free port $$TARGET_PORT" ; \
+	        fi ; \
+	        ;; \
+	      n|N|new) \
+	        read -p "Enter new port number: " newp ; \
+	        if [[ "$$newp" =~ ^[0-9]+$$ ]] && [ "$$newp" -ge 1024 ] && [ "$$newp" -le 65535 ]; then \
+	          if lsof -ti tcp:$$newp >/dev/null 2>&1; then \
+	            echo "❌ Port $$newp is also in use. Try another." ; \
+	          else \
+	            echo "✅ Port $$newp is available" ; \
+	            APP_PORT=$$newp ; export APP_PORT ; \
+	            echo "Using APP_PORT=$$APP_PORT" ; \
+	            break ; \
+	          fi ; \
+	        else \
+	          echo "❌ Invalid port. Please enter a number between 1024-65535." ; \
+	        fi ; \
+	        ;; \
+	      a|A|abort) \
+	        echo "🚫 Aborting startup." ; \
+	        exit 1 ; \
+	        ;; \
+	      *) \
+	        echo "❌ Invalid choice. Please enter 'k', 'n', or 'a'." ; \
+	        ;; \
+	    esac ; \
+	  done ; \
+	else \
+	  echo "✅ Port $$TARGET_PORT is available" ; \
+	  APP_PORT=$$TARGET_PORT ; export APP_PORT ; \
+	fi ; \
+	echo "" ; \
+	echo "🔐 Setting up TLS certificates..." ; \
 	if [ -f certs/localhost.crt ] && [ -f certs/localhost.key ]; then \
 		CERT_FILE=$$(pwd)/certs/localhost.crt ; \
 		KEY_FILE=$$(pwd)/certs/localhost.key ; \
@@ -111,9 +169,12 @@ run-https:
 	fi ; \
 	echo " Access Token: $$YOUTUBE_ACCESS_TOKEN" ; \
 	echo " Refresh Token: $$YOUTUBE_REFRESH_TOKEN" ; \
-	echo "Starting server with TLS using $$CERT_FILE" ; \
-	echo "  YouTube redirect : $$YOUTUBE_REDIRECT_URL" ; \
-	echo "  Facebook redirect: $$FACEBOOK_REDIRECT_URL" ; \
+	echo "" ; \
+	echo "🚀 Starting HTTPS server on port $$APP_PORT with TLS using $$CERT_FILE" ; \
+	echo "   📺 YouTube redirect : $$YOUTUBE_REDIRECT_URL" ; \
+	echo "   📘 Facebook redirect: $$FACEBOOK_REDIRECT_URL" ; \
+	echo "   🌐 Access via: https://localhost:$$APP_PORT" ; \
+	echo "" ; \
 	[ -n "$(APP_PORT)" ] && export APP_PORT=$(APP_PORT) ; \
 	export TLS_ENABLED=1 TLS_CERT_FILE=$$CERT_FILE TLS_KEY_FILE=$$KEY_FILE ; \
 	export YOUTUBE_REDIRECT_URL FACEBOOK_REDIRECT_URL ; \

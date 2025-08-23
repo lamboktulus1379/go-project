@@ -128,6 +128,7 @@ func InitiateRouter(
 			youtube.POST("/videos/upload", youtubeHandler.UploadVideo)
 			youtube.PATCH("/videos/:videoId", youtubeHandler.UpdateVideo)
 			youtube.GET("/search", youtubeHandler.SearchVideos)
+			youtube.GET("/summary", youtubeHandler.GetDashboardSummary)
 
 			// Video rating operations
 			youtube.POST("/videos/:videoId/like", youtubeHandler.LikeVideo)
@@ -169,6 +170,29 @@ func InitiateRouter(
 		// Add fallback endpoints when YouTube is not configured
 		youtube := api.Group("/youtube")
 		{
+			youtube.GET("/summary", func(ctx *gin.Context) {
+				ctx.JSON(http.StatusOK, gin.H{
+					"success": true,
+					"data": gin.H{
+						"total_videos":   2,
+						"total_views":    6912,
+						"avg_likes":      72.5,
+						"recent_uploads": 1,
+						"monthly_uploads": []gin.H{
+							{"month": "2025-04", "count": 0},
+							{"month": "2025-05", "count": 1},
+							{"month": "2025-06", "count": 0},
+							{"month": "2025-07", "count": 1},
+							{"month": "2025-08", "count": 0},
+							{"month": "2025-09", "count": 0},
+						},
+						"top_videos": []gin.H{
+							{"id": "mock-video-2", "title": "Sample Video 2", "views": 5678, "thumbnail": "https://placehold.co/320x180/png?text=Mock+Video+2", "published_at": "2025-08-05T00:00:00Z"},
+							{"id": "mock-video-1", "title": "Sample Video 1", "views": 1234, "thumbnail": "https://placehold.co/320x180/png?text=Mock+Video+1", "published_at": "2025-08-06T00:00:00Z"},
+						},
+					},
+				})
+			})
 			youtube.GET("/videos", func(ctx *gin.Context) {
 				ctx.JSON(http.StatusOK, gin.H{
 					"error":   false,
