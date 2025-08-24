@@ -36,14 +36,18 @@ func (r *ShareRepository) UpsertTrackShares(ctx context.Context, videoID, userID
 		// PostgreSQL upsert using ON CONFLICT
 		q := `INSERT INTO video_share_records (video_id, platform, user_id, status, attempt_count, created_at, updated_at)
               VALUES ($1,$2,$3,$4,1,$5,$5)
-              ON CONFLICT (video_id, platform, user_id) DO UPDATE SET
+              ON CONFLICT (video_id, platform, user_id) WHERE deleted_at IS NULL DO UPDATE SET
                 attempt_count = video_share_records.attempt_count + CASE WHEN video_share_records.status <> EXCLUDED.status THEN 1 ELSE 0 END,
                 status = CASE WHEN video_share_records.status = 'success' THEN video_share_records.status ELSE EXCLUDED.status END,
                 updated_at = EXCLUDED.updated_at`
 		if _, err = tx.ExecContext(ctx, q, videoID, p, userID, initialStatus, now); err != nil {
 			return nil, err
 		}
-		row := tx.QueryRowContext(ctx, `SELECT id, video_id, platform, user_id, status, error_message, external_ref, attempt_count, created_at, updated_at FROM video_share_records WHERE video_id=$1 AND platform=$2 AND user_id=$3`, videoID, p, userID)
+		row := tx.QueryRowContext(ctx, `SELECT id, video_id, platform, user_id, status, error_message, external_ref, attempt_count, created_at, updated_at
+			FROM video_share_records
+			WHERE video_id=$1 AND platform=$2 AND user_id=$3 AND deleted_at IS NULL
+			ORDER BY updated_at DESC
+			LIMIT 1`, videoID, p, userID)
 		rec := &model.VideoShareRecord{}
 		var errMsg, extRef sql.NullString
 		if err = row.Scan(&rec.ID, &rec.VideoID, &rec.Platform, &rec.UserID, &rec.Status, &errMsg, &extRef, &rec.AttemptCount, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
@@ -64,7 +68,9 @@ func (r *ShareRepository) UpsertTrackShares(ctx context.Context, videoID, userID
 }
 
 func (r *ShareRepository) GetShareStatus(ctx context.Context, videoID, userID string) ([]*model.VideoShareRecord, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id, video_id, platform, user_id, status, error_message, external_ref, attempt_count, created_at, updated_at FROM video_share_records WHERE video_id=$1 AND user_id=$2`, videoID, userID)
+	rows, err := r.db.QueryContext(ctx, `SELECT id, video_id, platform, user_id, status, error_message, external_ref, attempt_count, created_at, updated_at
+		FROM video_share_records
+		WHERE video_id=$1 AND user_id=$2 AND deleted_at IS NULL`, videoID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +129,12 @@ func (r *ShareRepository) EnqueueJobs(ctx context.Context, records []*model.Vide
 }
 
 func (r *ShareRepository) FetchPendingJobs(ctx context.Context, limit int) ([]*model.ShareJob, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id, record_id, platform, status, attempts, last_error, external_ref, created_at, updated_at FROM share_jobs WHERE status='pending' ORDER BY created_at ASC LIMIT $1`, limit)
+	rows, err := r.db.QueryContext(ctx, `SELECT j.id, j.record_id, j.platform, j.status, j.attempts, j.last_error, j.external_ref, j.created_at, j.updated_at
+		FROM share_jobs j
+		JOIN video_share_records r ON r.id = j.record_id AND r.deleted_at IS NULL
+		WHERE j.status='pending'
+		ORDER BY j.created_at ASC
+		LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -161,13 +172,13 @@ func (r *ShareRepository) MarkJobResult(ctx context.Context, jobID int64, succes
 }
 
 func (r *ShareRepository) UpdateRecordStatus(ctx context.Context, recordID int64, status string, errMsg *string) error {
-	_, err := r.db.ExecContext(ctx, `UPDATE video_share_records SET status=$1, error_message=$2, updated_at=$3 WHERE id=$4`, status, errMsg, time.Now().UTC(), recordID)
+	_, err := r.db.ExecContext(ctx, `UPDATE video_share_records SET status=$1, error_message=$2, updated_at=$3 WHERE id=$4 AND deleted_at IS NULL`, status, errMsg, time.Now().UTC(), recordID)
 	return err
 }
 
 // GetRecordByID fetches a single VideoShareRecord by primary id.
 func (r *ShareRepository) GetRecordByID(ctx context.Context, id int64) (*model.VideoShareRecord, error) {
-	row := r.db.QueryRowContext(ctx, `SELECT id, video_id, platform, user_id, status, error_message, external_ref, attempt_count, created_at, updated_at FROM video_share_records WHERE id=$1`, id)
+	row := r.db.QueryRowContext(ctx, `SELECT id, video_id, platform, user_id, status, error_message, external_ref, attempt_count, created_at, updated_at FROM video_share_records WHERE id=$1 AND deleted_at IS NULL`, id)
 	rec := &model.VideoShareRecord{}
 	var errMsg, extRef sql.NullString
 	if err := row.Scan(&rec.ID, &rec.VideoID, &rec.Platform, &rec.UserID, &rec.Status, &errMsg, &extRef, &rec.AttemptCount, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
