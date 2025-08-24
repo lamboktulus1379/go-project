@@ -97,3 +97,39 @@ ALTER TABLE public.oauth_tokens
     ADD COLUMN IF NOT EXISTS page_name VARCHAR(255) NULL,
     ADD COLUMN IF NOT EXISTS token_type VARCHAR(32) NULL; -- user | page
 --rollback ALTER TABLE public.oauth_tokens DROP COLUMN IF EXISTS token_type; ALTER TABLE public.oauth_tokens DROP COLUMN IF EXISTS page_name; ALTER TABLE public.oauth_tokens DROP COLUMN IF EXISTS page_id;
+
+--changeset lamboktulus1379:8 labels:share-feature context:share
+--comment: add external_ref columns for tracking platform post IDs
+ALTER TABLE IF EXISTS public.video_share_records
+    ADD COLUMN IF NOT EXISTS external_ref TEXT NULL;
+ALTER TABLE IF EXISTS public.share_jobs
+    ADD COLUMN IF NOT EXISTS external_ref TEXT NULL;
+--rollback ALTER TABLE IF EXISTS public.share_jobs DROP COLUMN IF EXISTS external_ref; ALTER TABLE IF EXISTS public.video_share_records DROP COLUMN IF EXISTS external_ref;
+
+--changeset lamboktulus1379:9 labels:share-feature context:share
+--comment: add next_attempt_at for retry/backoff scheduling on jobs
+ALTER TABLE IF EXISTS public.share_jobs
+    ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMPTZ NULL DEFAULT NULL;
+--rollback ALTER TABLE IF EXISTS public.share_jobs DROP COLUMN IF EXISTS next_attempt_at;
+
+--changeset lamboktulus1379:10 labels:share-feature context:share
+--comment: add error_code columns to classify failures
+ALTER TABLE IF EXISTS public.share_jobs
+    ADD COLUMN IF NOT EXISTS error_code VARCHAR(64) NULL;
+ALTER TABLE IF EXISTS public.video_share_records
+    ADD COLUMN IF NOT EXISTS error_code VARCHAR(64) NULL;
+--rollback ALTER TABLE IF EXISTS public.video_share_records DROP COLUMN IF EXISTS error_code; ALTER TABLE IF EXISTS public.share_jobs DROP COLUMN IF EXISTS error_code;
+
+--changeset lamboktulus1379:11 labels:share-feature context:share
+--comment: soft delete support for video_share_records
+ALTER TABLE IF EXISTS public.video_share_records
+    ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ NULL DEFAULT NULL;
+--rollback ALTER TABLE IF EXISTS public.video_share_records DROP COLUMN IF EXISTS deleted_at;
+
+--changeset lamboktulus1379:12 labels:share-feature context:share
+--comment: drop legacy unique constraint if present (simplified without DO block) and add partial unique index for active rows
+ALTER TABLE public.video_share_records DROP CONSTRAINT IF EXISTS uq_video_platform_user;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_video_platform_user_active
+    ON public.video_share_records (video_id, platform, user_id)
+    WHERE deleted_at IS NULL;
+--rollback DROP INDEX IF EXISTS uq_video_platform_user_active;

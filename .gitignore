@@ -102,3 +102,9 @@ token.json
 
 # Local TLS certs
 certs/
+
+# macOS Finder metadata
+.DS_Store
+
+# Liquibase generated SQL (offline/dry-run)
+liquibase/**/generated-*.sql

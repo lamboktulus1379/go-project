@@ -16,7 +16,7 @@ create table user (
 
 --changeset lamboktulus1379:2 labels:my-project-label context:my-project-context
 --comment: my-project comment
-ALTER TABLE `user` 
+ALTER TABLE `user`
     MODIFY `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
 --rollback ALTER TABLE `user` MODIFY `updated_at` TIMESTAMP;
 
@@ -87,3 +87,25 @@ CREATE TABLE IF NOT EXISTS oauth_tokens (
     INDEX idx_platform_user (platform, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 --rollback DROP TABLE IF EXISTS oauth_tokens;
+
+--changeset lamboktulus1379:7 labels:share-feature context:share
+--comment: add external_ref columns for tracking platform post IDs
+ALTER TABLE video_share_records
+    ADD COLUMN IF NOT EXISTS external_ref TEXT NULL;
+ALTER TABLE share_jobs
+    ADD COLUMN IF NOT EXISTS external_ref TEXT NULL;
+--rollback ALTER TABLE share_jobs DROP COLUMN IF EXISTS external_ref; ALTER TABLE video_share_records DROP COLUMN IF EXISTS external_ref;
+
+--changeset lamboktulus1379:8 labels:share-feature context:share
+--comment: add next_attempt_at for retry/backoff scheduling
+ALTER TABLE share_jobs
+    ADD COLUMN IF NOT EXISTS next_attempt_at TIMESTAMP NULL DEFAULT NULL;
+--rollback ALTER TABLE share_jobs DROP COLUMN IF EXISTS next_attempt_at;
+
+--changeset lamboktulus1379:9 labels:share-feature context:share
+--comment: add error_code to classify failures (jobs and records)
+ALTER TABLE share_jobs
+    ADD COLUMN IF NOT EXISTS error_code VARCHAR(64) NULL;
+ALTER TABLE video_share_records
+    ADD COLUMN IF NOT EXISTS error_code VARCHAR(64) NULL;
+--rollback ALTER TABLE video_share_records DROP COLUMN IF EXISTS error_code; ALTER TABLE share_jobs DROP COLUMN IF EXISTS error_code;
