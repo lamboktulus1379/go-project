@@ -66,12 +66,16 @@ func GetYouTubeConfig() (*YouTubeConfig, error) {
 
 // getConfigValue gets value from config first, then environment variable, then default
 func getConfigValue(configValue, envKey, defaultValue string) string {
-	// If config value is set and not a placeholder, use it
+	// Environment variable takes precedence when provided
+	if v := os.Getenv(envKey); v != "" {
+		return v
+	}
+	// Otherwise use config value if set and not a placeholder
 	if configValue != "" && !strings.HasPrefix(configValue, "YOUR_") {
 		return configValue
 	}
-	// Otherwise fall back to environment variable
-	return getEnv(envKey, defaultValue)
+	// Fallback default
+	return defaultValue
 }
 
 // getEnv gets environment variable with default value

@@ -13,6 +13,7 @@ help:
 	@echo "Available targets:" ; \
 	echo "  help                 Show this help" ; \
 	echo "  up                   One-shot: start app on 10010 + configure Nginx for gra.tulus.tech" ; \
+	echo "  up-yt                Same as 'up' but with YouTube OAuth overrides (export YT_* vars)" ; \
 	echo "  pg-update            Apply pending PostgreSQL changesets" ; \
 	echo "  pg-update-sql        Preview PostgreSQL SQL (no apply)" ; \
 	echo "  pg-clear             Clear Liquibase checksums (PostgreSQL)" ; \
@@ -38,102 +39,54 @@ help:
 
 .PHONY: run-https
 run-https:
-	@mkdir -p certs
-	@PRESET_APP_PORT="$$APP_PORT" ; \
-	set -a ; \
-	[ -f config.env ] && . ./config.env ; \
-	set +a ; \
-	TARGET_PORT=$${PRESET_APP_PORT:-$${APP_PORT:-10001}} ; \
-	echo "Checking port $$TARGET_PORT..." ; \
-	INUSE_PIDS=$$(lsof -ti tcp:$$TARGET_PORT 2>/dev/null || true) ; \
-	if [ -n "$$INUSE_PIDS" ]; then \
-	  if [ "$(NONINTERACTIVE)" = "1" ]; then \
-	    echo "Killing processes on $$TARGET_PORT: $$INUSE_PIDS" ; \
-	    kill $$INUSE_PIDS 2>/dev/null || true ; \
-	    sleep 1 ; \
-	    REMAIN=$$(lsof -ti tcp:$$TARGET_PORT 2>/dev/null || true) ; \
-	    [ -n "$$REMAIN" ] && kill -9 $$REMAIN 2>/dev/null || true ; \
-	  else \
-	    echo "Port $$TARGET_PORT is in use: $$INUSE_PIDS (set NONINTERACTIVE=1 to auto-kill)" ; \
-	    exit 1 ; \
-	  fi ; \
-	fi ; \
-	APP_PORT=$$TARGET_PORT ; export APP_PORT ; \
-	echo "🔐 Setting up TLS certificates..." ; \
-	if [ -f certs/localhost.crt ] && [ -f certs/localhost.key ]; then \
-		CERT_FILE=$$(pwd)/certs/localhost.crt ; \
-		KEY_FILE=$$(pwd)/certs/localhost.key ; \
-		echo "Using provided certs: $$CERT_FILE $$KEY_FILE" ; \
-	elif command -v mkcert >/dev/null 2>&1; then \
-		echo "Using mkcert to generate a trusted localhost certificate..." ; \
-		mkcert -install >/dev/null 2>&1 || true ; \
-		if [ ! -f certs/localhost+2.pem ] || [ ! -f certs/localhost+2-key.pem ]; then \
-			( cd certs && mkcert localhost 127.0.0.1 ::1 ); \
+		@mkdir -p certs
+		@PRESET_APP_PORT="$$APP_PORT" ; \
+		set -a ; \
+		[ -f config.env ] && . ./config.env ; \
+		set +a ; \
+		TARGET_PORT=$${PRESET_APP_PORT:-$${APP_PORT:-10001}} ; \
+		echo "Checking port $$TARGET_PORT..." ; \
+		INUSE_PIDS=$$(lsof -ti tcp:$$TARGET_PORT 2>/dev/null || true) ; \
+		if [ -n "$$INUSE_PIDS" ]; then \
+			if [ "$(NONINTERACTIVE)" = "1" ]; then \
+				echo "Killing processes on $$TARGET_PORT: $$INUSE_PIDS" ; \
+				kill $$INUSE_PIDS 2>/dev/null || true ; \
+				sleep 1 ; \
+				REMAIN=$$(lsof -ti tcp:$$TARGET_PORT 2>/dev/null || true) ; \
+				[ -n "$$REMAIN" ] && kill -9 $$REMAIN 2>/dev/null || true ; \
+			else \
+				echo "Port $$TARGET_PORT is in use: $$INUSE_PIDS (set NONINTERACTIVE=1 to auto-kill)" ; \
+				exit 1 ; \
+			fi ; \
+		else \
+			echo "✅ Port $$TARGET_PORT is available" ; \
 		fi ; \
-		CERT_FILE=$$(pwd)/certs/localhost+2.pem ; \
-		KEY_FILE=$$(pwd)/certs/localhost+2-key.pem ; \
-	else \
-		echo "mkcert not found; generating self-signed cert (may show browser warning)..." ; \
-		if [ ! -f certs/dev.localhost.crt ] || [ ! -f certs/dev.localhost.key ]; then \
-			openssl req -x509 -newkey rsa:2048 -nodes -keyout certs/dev.localhost.key -out certs/dev.localhost.crt -days 365 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1" ; \
+		APP_PORT=$$TARGET_PORT ; export APP_PORT ; \
+		echo "🔐 Setting up TLS certificates..." ; \
+		if [ -f certs/localhost.crt ] && [ -f certs/localhost.key ]; then \
+				CERT_FILE=$$(pwd)/certs/localhost.crt ; \
+				KEY_FILE=$$(pwd)/certs/localhost.key ; \
+				echo "Using provided certs: $$CERT_FILE $$KEY_FILE" ; \
+		elif command -v mkcert >/dev/null 2>&1; then \
+				echo "Using mkcert to generate a trusted localhost certificate..." ; \
+				mkcert -install >/dev/null 2>&1 || true ; \
+				if [ ! -f certs/localhost+2.pem ] || [ ! -f certs/localhost+2-key.pem ]; then \
+						( cd certs && mkcert localhost 127.0.0.1 ::1 ); \
+				fi ; \
+				CERT_FILE=$$(pwd)/certs/localhost+2.pem ; \
+				KEY_FILE=$$(pwd)/certs/localhost+2-key.pem ; \
+		else \
+				echo "mkcert not found; generating self-signed cert (may show browser warning)..." ; \
+				if [ ! -f certs/dev.localhost.crt ] || [ ! -f certs/dev.localhost.key ]; then \
+						openssl req -x509 -newkey rsa:2048 -nodes -keyout certs/dev.localhost.key -out certs/dev.localhost.crt -days 365 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1" ; \
+				fi ; \
+				CERT_FILE=$$(pwd)/certs/dev.localhost.crt ; \
+				KEY_FILE=$$(pwd)/certs/dev.localhost.key ; \
 		fi ; \
-		CERT_FILE=$$(pwd)/certs/dev.localhost.crt ; \
-		KEY_FILE=$$(pwd)/certs/dev.localhost.key ; \
-	fi ; \
-	export TLS_ENABLED=1 TLS_CERT_FILE=$$CERT_FILE TLS_KEY_FILE=$$KEY_FILE ; \
-	echo "🚀 Starting HTTPS server on port $$APP_PORT" ; \
-	go run main.go
-	            echo "❌ Invalid port. Please enter a number between 1024-65535." ; \
-	          fi ; \
-	          ;; \
-	        a|A|abort) \
-	          echo "🚫 Aborting startup." ; \
-	          exit 1 ; \
-	          ;; \
-	        *) \
-	          echo "❌ Invalid choice. Please enter 'k', 'n', or 'a'." ; \
-	          ;; \
-	      esac ; \
-	    done ; \
-	  fi ; \
-	else \
-	  echo "✅ Port $$TARGET_PORT is available" ; \
-	  APP_PORT=$$TARGET_PORT ; export APP_PORT ; \
-	fi ; \
-	echo "" ; \
-	echo "🔐 Setting up TLS certificates..." ; \
-	if [ -f certs/localhost.crt ] && [ -f certs/localhost.key ]; then \
-		CERT_FILE=$$(pwd)/certs/localhost.crt ; \
-		KEY_FILE=$$(pwd)/certs/localhost.key ; \
-		echo "Using provided certs: $$CERT_FILE $$KEY_FILE" ; \
-	elif command -v mkcert >/dev/null 2>&1; then \
-		echo "Using mkcert to generate a trusted localhost certificate..." ; \
-		mkcert -install >/dev/null 2>&1 || true ; \
-		if [ ! -f certs/localhost+2.pem ] || [ ! -f certs/localhost+2-key.pem ]; then \
-			( cd certs && mkcert localhost 127.0.0.1 ::1 ); \
-		fi ; \
-		CERT_FILE=$$(pwd)/certs/localhost+2.pem ; \
-		KEY_FILE=$$(pwd)/certs/localhost+2-key.pem ; \
-	else \
-		echo "mkcert not found; generating self-signed cert (may show browser warning)..." ; \
-		if [ ! -f certs/dev.localhost.crt ] || [ ! -f certs/dev.localhost.key ]; then \
-			openssl req -x509 -newkey rsa:2048 -nodes -keyout certs/dev.localhost.key -out certs/dev.localhost.crt -days 365 -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1,IP:::1" ; \
-		fi ; \
-		CERT_FILE=$$(pwd)/certs/dev.localhost.crt ; \
-		KEY_FILE=$$(pwd)/certs/dev.localhost.key ; \
-	fi ; \
-	echo " Access Token: $$YOUTUBE_ACCESS_TOKEN" ; \
-	echo " Refresh Token: $$YOUTUBE_REFRESH_TOKEN" ; \
-	echo "" ; \
-		echo "🚀 Starting HTTPS server on port $$APP_PORT with TLS using $$CERT_FILE" ; \
-	echo "   📺 YouTube redirect : $$YOUTUBE_REDIRECT_URL" ; \
-	echo "   📘 Facebook redirect: $$FACEBOOK_REDIRECT_URL" ; \
-	echo "   🌐 Access via: https://localhost:$$APP_PORT" ; \
-	echo "" ; \
-	[ -n "$(APP_PORT)" ] && export APP_PORT=$(APP_PORT) ; \
-	export TLS_ENABLED=1 TLS_CERT_FILE=$$CERT_FILE TLS_KEY_FILE=$$KEY_FILE ; \
-	export YOUTUBE_REDIRECT_URL FACEBOOK_REDIRECT_URL ; \
-	go run main.go
+		echo "   📺 YouTube redirect : $$YOUTUBE_REDIRECT_URL" ; \
+		echo "   🌐 Access via: https://localhost:$$APP_PORT" ; \
+		export TLS_ENABLED=1 TLS_CERT_FILE=$$CERT_FILE TLS_KEY_FILE=$$KEY_FILE ; \
+		go run main.go
 
 .PHONY: run-https-10010
 run-https-10010:
@@ -167,6 +120,16 @@ test:
 .PHONY: up
 up:
 	@chmod +x ./run-all.sh && ./run-all.sh
+
+.PHONY: up-yt
+up-yt:
+	@chmod +x ./run-all.sh && \
+	YOUTUBE_CLIENT_ID="$${YT_CLIENT_ID}" \
+	YOUTUBE_CLIENT_SECRET="$${YT_CLIENT_SECRET}" \
+	YOUTUBE_REDIRECT_URL="$${YT_REDIRECT_URL}" \
+	YOUTUBE_ACCESS_TOKEN="$${YT_ACCESS_TOKEN}" \
+	YOUTUBE_REFRESH_TOKEN="$${YT_REFRESH_TOKEN}" \
+	./run-all.sh
 
 .PHONY: deploy
 deploy:

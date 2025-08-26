@@ -85,7 +85,8 @@ server {
   ssl_certificate     $CERTS_DIR/${DOMAIN}.pem;
   ssl_certificate_key $CERTS_DIR/${DOMAIN}-key.pem;
 
-  location /health { return 200 'ok'; add_header Content-Type text/plain; }
+  # Simple health endpoint served by Nginx (not the app)
+  location /healthz { return 200 'ok'; add_header Content-Type text/plain; }
 
   location / {
     proxy_pass https://127.0.0.1:$PORT;
@@ -93,8 +94,10 @@ server {
     proxy_set_header X-Real-IP \$remote_addr;
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto https;
+  # Forward Authorization so upstream sees Bearer tokens
+  proxy_set_header Authorization \$http_authorization;
     proxy_ssl_verify off;
-    proxy_read_timeout 60s;
+  proxy_read_timeout 300s;
   }
 }
 EOF
@@ -154,29 +157,42 @@ start_go()
     fi
   fi
   # spawn
-  ( APP_PORT=$PORT TLS_ENABLED=1 TLS_CERT_FILE="$CERT" TLS_KEY_FILE="$KEY" \
+  ( APP_PORT=$PORT TLS_ENABLED=1 TLS_CERT_FILE="$CERT" TLS_KEY_FILE="$KEY" GODEBUG=x509usefallbackroots=1 \
       nohup go run main.go > "$LOG_FILE" 2>&1 & echo $! > "$PID_FILE" )
   sleep 1
+  # Wait for app to listen; allow override via APP_START_TIMEOUT (seconds)
+  local TIMEOUT=${APP_START_TIMEOUT:-45}
   if ! lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-    warn "App not listening yet; waiting up to 20s..."
-    for i in {1..20}; do
+    warn "App not listening yet; waiting up to ${TIMEOUT}s..."
+    for i in $(seq 1 $TIMEOUT); do
       sleep 1
       if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then break; fi
+      # Also treat any HTTP response from / as readiness (even 404)
+      local code
+      code=$(curl -k -s -o /dev/null -w "%{http_code}" https://127.0.0.1:$PORT/ || true)
+      if [[ -n "$code" && "$code" != "000" ]]; then break; fi
     done
   fi
   if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
     ok "Go app listening on $PORT (PID $(cat "$PID_FILE" 2>/dev/null || echo '?'))"
   else
-    err "Go app failed to start; see $LOG_FILE"
-    tail -n 60 "$LOG_FILE" || true
-    exit 1
+    # One last HTTP probe before failing
+    local code
+    code=$(curl -k -s -o /dev/null -w "%{http_code}" https://127.0.0.1:$PORT/ || true)
+    if [[ -n "$code" && "$code" != "000" ]]; then
+      ok "Go app responded with HTTP $code on / (treating as ready)"
+    else
+      err "Go app failed to start; see $LOG_FILE"
+      tail -n 80 "$LOG_FILE" || true
+      exit 1
+    fi
   fi
 }
 
 verify()
 {
   say "Probing local app..."
-  curl -k -s -o /dev/null -w "LOCAL:%{http_code}\n" https://127.0.0.1:$PORT/healthz || true
+  curl -k -s -o /dev/null -w "LOCAL:%{http_code}\n" https://127.0.0.1:$PORT/ || true
   say "Probing via nginx ($DOMAIN)..."
   curl -k -s -o /dev/null -w "GRA:%{http_code}\n" https://$DOMAIN/ || true
 }
