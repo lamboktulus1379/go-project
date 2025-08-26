@@ -18,7 +18,7 @@ NGINX_CONFIG_DIR="/opt/homebrew/etc/nginx"
 NGINX_SERVERS_DIR="$NGINX_CONFIG_DIR/servers"
 NGINX_CERTS_DIR="$NGINX_CONFIG_DIR/certs"
 DOMAIN="gra.tulus.tech"
-GO_PORT=10001
+GO_PORT=10010
 REDIRECT_PORT=10020
 LOG_FILE="/tmp/go-app-deployment.log"
 
@@ -232,7 +232,7 @@ start_go_app() {
     kill_port_processes $GO_PORT
 
     # Start the application in the background
-    nohup make run-https > "$LOG_FILE" 2>&1 &
+    nohup make NONINTERACTIVE=1 APP_PORT=$GO_PORT run-https > "$LOG_FILE" 2>&1 &
     local go_pid=$!
 
     # Wait a moment for the app to start

@@ -36,7 +36,7 @@ main() {
     case "${1:-help}" in
         "start"|"deploy")
             echo -e "${BLUE}Starting Go Project deployment...${NC}"
-            "$DEPLOY_SCRIPT"
+            APP_PORT=10010 "$DEPLOY_SCRIPT"
             ;;
         "stop")
             echo -e "${YELLOW}Stopping services...${NC}"

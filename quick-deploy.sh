@@ -20,6 +20,6 @@ echo "  ./service.sh logs    # View logs"
 echo "  ./service.sh stop    # Stop services"
 echo
 echo "Access your application:"
-echo "  https://localhost:10001  (Direct)"
+echo "  https://localhost:10010  (Direct)"
 echo "  https://gra.tulus.tech   (Via proxy)"
 echo "  http://localhost:10020   (Redirects to proxy)"
