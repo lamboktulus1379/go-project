@@ -108,3 +108,4 @@ certs/
 
 # Liquibase generated SQL (offline/dry-run)
 liquibase/**/generated-*.sql
+*.log
