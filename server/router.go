@@ -38,13 +38,9 @@ func InitiateRouter(
 	api := router.Group("api")
 	api.Use(middleware.Auth(userRepository))
 
-	// Root endpoint - return 404 Not Found
+	// Root endpoint - return a simple message
 	router.GET("/", func(ctx *gin.Context) {
-		ctx.JSON(http.StatusNotFound, gin.H{
-			"error":   true,
-			"message": "Not Found",
-			"path":    ctx.Request.URL.Path,
-		})
+		ctx.String(http.StatusOK, "Gra")
 	})
 
 	router.POST("/login", userHandler.Login)
