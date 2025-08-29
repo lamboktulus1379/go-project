@@ -1,3 +1,30 @@
+# General
+.DS_Store
+.vscode/
+.idea/
+*.log
+
+# Go
+bin/
+dist/
+build/
+coverage.html
+cover.txt
+command.log
+
+# Docker/compose generated
+**/.env
+config.env
+config.env.example
+config_windows.env
+config.toml
+config.json
+config-stage.json
+credentials.json
+client_secret_*.json
+
+# Node (if any)
+node_modules/
 # local TLS certs and launchd artifacts
 certs/
 *.pem
