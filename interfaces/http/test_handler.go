@@ -3,12 +3,14 @@ package http
 import (
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"my-project/usecase"
+
+	"github.com/gin-gonic/gin"
 )
 
 type ITestHandler interface {
 	Test(c *gin.Context)
+	Healthz(c *gin.Context)
 }
 
 type TestHandler struct {
@@ -22,4 +24,9 @@ func NewTestHandler(testUsecase usecase.ITestUsecase) ITestHandler {
 func (testHandler *TestHandler) Test(c *gin.Context) {
 	res := testHandler.TestUsecase.Test(c.Request.Context())
 	c.JSON(http.StatusOK, res)
+}
+
+// Healthz returns OK for health checks
+func (h *TestHandler) Healthz(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

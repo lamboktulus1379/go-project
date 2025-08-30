@@ -100,6 +100,8 @@ func InitiateRouter(
 		})
 	}
 
+	// Health endpoint
+	router.GET("/healthz", testHandler.Healthz)
 	router.POST("/healthz", testHandler.Test)
 
 	api.POST("/", func(ctx *gin.Context) {
