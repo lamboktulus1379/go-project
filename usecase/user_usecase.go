@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"crypto/md5"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,6 +13,8 @@ import (
 	"my-project/infrastructure/configuration"
 	"my-project/infrastructure/logger"
 	"my-project/infrastructure/utils"
+
+	mssql "github.com/microsoft/go-mssqldb"
 )
 
 type IUserUsecase interface {
@@ -89,6 +92,17 @@ func (userUcase *UserUsecase) Register(ctx context.Context, req model.ReqRegiste
 
 	err := userUcase.userRepository.CreateUser(ctx, reqUser)
 	if err != nil {
+		// Map SQL Server unique constraint violations to 409 Conflict
+		var sqlErr mssql.Error
+		if errors.As(err, &sqlErr) {
+			switch sqlErr.Number {
+			case 2627, 2601: // Unique constraint or duplicate key
+				res.Data = nil
+				res.ResponseCode = "409"
+				res.ResponseMessage = "Username already exists"
+				return res
+			}
+		}
 		res.Data = nil
 		res.ResponseCode = "500"
 		res.ResponseMessage = "Internal server error"

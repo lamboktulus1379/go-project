@@ -55,6 +55,19 @@ func main() {
 
 	g, ctx := errgroup.WithContext(ctx)
 
+	// Load env from files (non-destructive; OS env still has precedence)
+	configuration.LoadEnvFromFile("config.env", ".env")
+	// Log which env files are present to help diagnose prod config loading
+	if _, err := os.Stat("config.env"); err == nil {
+		logger.GetLogger().Info("Detected config.env in working directory")
+	} else {
+		logger.GetLogger().Info("config.env not found in working directory")
+	}
+	if _, err := os.Stat(".env"); err == nil {
+		logger.GetLogger().Info("Detected .env in working directory")
+	} else {
+		logger.GetLogger().Info(".env not found in working directory")
+	}
 	// configuration.LoadConfig()
 
 	app := configuration.C.App
@@ -83,9 +96,16 @@ func main() {
 		}
 	}
 
+	// Log DB connectivity safely
+	var psqlPing interface{}
+	if psqlDb != nil {
+		psqlPing = psqlDb.Ping()
+	} else {
+		psqlPing = "nil"
+	}
 	logger.GetLogger().
-		WithField("MySQLDb", mysqlDb.Ping()).
-		WithField("PSQLDb", psqlDb.Ping()).
+		WithField("PrimaryDB", mysqlDb.Ping()).
+		WithField("PSQLDb", psqlPing).
 		Info("Database connected.")
 
 	pubSubClient, err := pubsub.NewPubSub(ctx, configuration.C.Pubsub.ProjectID)
@@ -121,7 +141,13 @@ func main() {
 	testPubSub := pubsub.NewTestPubSub(pubSubClient)
 	testServiceBus := servicebus.NewTestServiceBus(azServiceBusClient)
 
-	userRepository := persistence.NewUserRepository(psqlDb)
+	// Repository wiring: use MSSQL in production, otherwise PostgreSQL.
+	var userRepository repository.IUser
+	if psqlDb == nil { // production/MSSQL path from InitiateDatabase
+		userRepository = persistence.NewUserRepositoryMSSQL(mysqlDb)
+	} else {
+		userRepository = persistence.NewUserRepository(psqlDb)
+	}
 	userUsecase := usecase.NewUserUsecase(userRepository)
 	testUsecase := usecase.NewTestUsecase(tulusTechHost, testPubSub, testServiceBus, testCache)
 
@@ -155,8 +181,14 @@ func main() {
 		youtubeAuthHandler = nil
 	}
 
-	// Initialize YouTube client if we have either access tokens OR API key
-	if youtubeConfig != nil &&
+	// Respect an explicit switch to force mock-only mode regardless of credentials
+	forceMockMode := os.Getenv("YOUTUBE_MODE") == "mock" || os.Getenv("YOUTUBE_MODE") == "disabled" || os.Getenv("YOUTUBE_ENABLED") == "false"
+	if forceMockMode {
+		logger.GetLogger().WithFields(map[string]interface{}{
+			"YOUTUBE_MODE":    os.Getenv("YOUTUBE_MODE"),
+			"YOUTUBE_ENABLED": os.Getenv("YOUTUBE_ENABLED"),
+		}).Info("Forcing mock-only mode for YouTube: skipping real YouTube client initialization")
+	} else if youtubeConfig != nil &&
 		((youtubeConfig.AccessToken != "" && youtubeConfig.AccessToken != "your_access_token_here") ||
 			(youtubeConfig.APIKey != "" && youtubeConfig.APIKey != "YOUR_YOUTUBE_API_KEY")) {
 
@@ -179,8 +211,10 @@ func main() {
 			logger.GetLogger().WithField("error", err).Warn("Failed to initialize YouTube client - YouTube features will be disabled")
 		} else {
 			// Ensure cache schema and attach cache repository
-			if err := persistence.EnsureYouTubeCacheSchema(psqlDb); err != nil {
-				logger.GetLogger().WithField("error", err).Error("failed ensuring youtube cache schema")
+			if psqlDb != nil {
+				if err := persistence.EnsureYouTubeCacheSchema(psqlDb); err != nil {
+					logger.GetLogger().WithField("error", err).Error("failed ensuring youtube cache schema")
+				}
 			}
 			ytCache := persistence.NewYouTubeCacheRepository(psqlDb)
 			// Create YouTubeRepository that combines API client and cache
@@ -196,36 +230,54 @@ func main() {
 		logger.GetLogger().Info("YouTube API credentials not configured - YouTube features will be disabled (using mock data only; PATCH route will return 501 fallback)")
 	}
 
+	// Summarize effective YouTube mode for quick visibility
+	effectiveMode := "mock"
+	if forceMockMode {
+		effectiveMode = "disabled"
+	} else if youtubeClient != nil {
+		effectiveMode = "live"
+	}
+	logger.GetLogger().WithFields(map[string]interface{}{
+		"effectiveMode": effectiveMode,
+		"handlerActive": youtubeHandler != nil,
+	}).Info("YouTube initialization summary")
+
 	userHandler := httpHandler.NewUserHandler(userUsecase)
 	testHandler := httpHandler.NewTestHandler(testUsecase)
 
-	// Share feature wiring (now using PostgreSQL DB)
-	shareRepo := persistence.NewShareRepository(psqlDb)
-	// Use PostgreSQL for OAuth tokens (queries use $1 style placeholders)
-	oauthRepo := persistence.NewOAuthTokenRepository(psqlDb)
-	if err := persistence.EnsureOAuthTokenSchema(psqlDb); err != nil {
-		logger.GetLogger().WithField("error", err).Error("failed ensuring oauth token schema")
-	}
-	if err := persistence.EnsureShareSchema(psqlDb); err != nil {
-		logger.GetLogger().WithField("error", err).Error("failed ensuring share schema (external_ref columns)")
-	}
+	// Share feature wiring (PostgreSQL only for now)
 	var shareHandler httpHandler.IShareHandler
 	shareHub := realtime.NewShareHub()
-	if len(configuration.C.Share.Platforms) == 0 {
-		configuration.C.Share.Platforms = []string{"twitter", "facebook", "whatsapp"}
-	}
-	if youtubeClient != nil {
-		shareUC := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms, youtubeClient)
-		shareUC = shareUC.WithBroadcaster(func(rec *model.VideoShareRecord) { shareHub.BroadcastShareStatus(rec) })
-		shareHandler = httpHandler.NewShareHandler(shareUC, configuration.C.Share.Platforms)
+	if psqlDb != nil {
+		shareRepo := persistence.NewShareRepository(psqlDb)
+		oauthRepo := persistence.NewOAuthTokenRepository(psqlDb)
+		if err := persistence.EnsureOAuthTokenSchema(psqlDb); err != nil {
+			logger.GetLogger().WithField("error", err).Error("failed ensuring oauth token schema")
+		}
+		if err := persistence.EnsureShareSchema(psqlDb); err != nil {
+			logger.GetLogger().WithField("error", err).Error("failed ensuring share schema (external_ref columns)")
+		}
+		if len(configuration.C.Share.Platforms) == 0 {
+			configuration.C.Share.Platforms = []string{"twitter", "facebook", "whatsapp"}
+		}
+		if youtubeClient != nil {
+			shareUC := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms, youtubeClient)
+			shareUC = shareUC.WithBroadcaster(func(rec *model.VideoShareRecord) { shareHub.BroadcastShareStatus(rec) })
+			shareHandler = httpHandler.NewShareHandler(shareUC, configuration.C.Share.Platforms)
+		} else {
+			shareUC := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms)
+			shareUC = shareUC.WithBroadcaster(func(rec *model.VideoShareRecord) { shareHub.BroadcastShareStatus(rec) })
+			shareHandler = httpHandler.NewShareHandler(shareUC, configuration.C.Share.Platforms)
+		}
 	} else {
-		shareUC := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms)
-		shareUC = shareUC.WithBroadcaster(func(rec *model.VideoShareRecord) { shareHub.BroadcastShareStatus(rec) })
-		shareHandler = httpHandler.NewShareHandler(shareUC, configuration.C.Share.Platforms)
+		logger.GetLogger().Info("PostgreSQL not available in this environment; Share feature disabled")
 	}
 
-	// Facebook OAuth handler (uses same oauth token repo)
-	facebookOAuthHandler := httpHandler.NewFacebookOAuthHandler(oauthRepo)
+	// Facebook OAuth handler (uses PostgreSQL-backed token repo); only when Postgres is available
+	var facebookOAuthHandler httpHandler.IFacebookOAuthHandler
+	if psqlDb != nil {
+		facebookOAuthHandler = httpHandler.NewFacebookOAuthHandler(persistence.NewOAuthTokenRepository(psqlDb))
+	}
 
 	router := server.InitiateRouter(userHandler, testHandler, youtubeHandler, youtubeAuthHandler, userRepository, shareHandler, facebookOAuthHandler)
 
@@ -238,7 +290,10 @@ func main() {
 	}
 
 	// Background share job processor (simple ticker loop)
-	if shareHandler != nil {
+	if shareHandler != nil && psqlDb != nil {
+		// Recreate repos for job processor scope
+		shareRepo := persistence.NewShareRepository(psqlDb)
+		oauthRepo := persistence.NewOAuthTokenRepository(psqlDb)
 		g.Go(func() error {
 			ticker := time.NewTicker(15 * time.Second)
 			defer ticker.Stop()
@@ -247,7 +302,6 @@ func main() {
 				case <-ctx.Done():
 					return ctx.Err()
 				case <-ticker.C:
-					// Process up to N pending jobs each tick
 					procCtx, cancelProc := context.WithTimeout(ctx, 5*time.Second)
 					_ = usecase.ProcessShareJobs(procCtx, shareRepo, oauthRepo, youtubeClient, 10, func(rec *model.VideoShareRecord) {
 						shareHub.BroadcastShareStatus(rec)
@@ -329,20 +383,39 @@ func main() {
 }
 
 func InitiateDatabase() (*sql.DB, *sql.DB, error) {
-	var err error
+	// Contract: return (primaryDB, psqlDB). In production, primaryDB = MSSQL and psqlDB may be nil.
+	// Locally, primaryDB = MySQL native (existing) and psqlDB = PostgreSQL.
+	env := os.Getenv("ENV")
+	// Allow overriding vendor explicitly (e.g., DB_VENDOR=mssql) for local tests against Typing's docker-compose
+	if v := os.Getenv("DB_VENDOR"); v == "mssql" {
+		mssql, err := persistence.NewMSSQLDB()
+		if err != nil {
+			logger.GetLogger().WithField("error", err).Error("Cannot connect to MSSQL (DB_VENDOR=mssql)")
+			return nil, nil, err
+		}
+		return mssql, nil, nil
+	}
+	if env == "production" || env == "prod" {
+		mssql, err := persistence.NewMSSQLDB()
+		if err != nil {
+			logger.GetLogger().WithField("error", err).Error("Cannot connect to MSSQL (production)")
+			return nil, nil, err
+		}
+		// In production we don’t require local PostgreSQL; repositories that need Postgres-only features should be adjusted by caller.
+		return mssql, nil, nil
+	}
 
+	// Default/local: keep current behavior (MySQL native + PostgreSQL)
 	db, err := persistence.NewNativeDb()
 	if err != nil {
 		logger.GetLogger().WithField("error", err).Error("Cannot connect to the local database")
 		return nil, nil, err
 	}
-
 	postgres, err := persistence.NewPostgreSQLDB()
 	if err != nil {
 		return nil, nil, err
 	}
-
-	return db, postgres, err
+	return db, postgres, nil
 }
 
 func InitiateGoroutine() {

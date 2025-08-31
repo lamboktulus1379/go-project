@@ -1,7 +1,6 @@
 package http
 
 import (
-	"crypto/md5"
 	"fmt"
 	"net/http"
 
@@ -51,9 +50,6 @@ func (userHandler *UserHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, fmt.Sprintf("An error occurred: %v", err.Error()))
 		return
 	}
-
-	data := []byte(req.Password)
-	req.Password = fmt.Sprintf("%x", md5.Sum(data))
 
 	res := userHandler.userUsecase.Register(c.Request.Context(), req)
 

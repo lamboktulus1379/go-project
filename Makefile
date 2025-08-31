@@ -22,6 +22,11 @@ help:
 	echo "  mysql-update-sql     Preview MySQL SQL (no apply)" ; \
 	echo "  mysql-clear          Clear Liquibase checksums (MySQL)" ; \
 	echo "  mysql-rollback       Roll back COUNT MySQL changesets" ; \
+	echo "  mssql-update         Apply pending MSSQL (Azure SQL) changesets" ; \
+	echo "  mssql-update-sql     Preview MSSQL SQL (no apply)" ; \
+	echo "  mssql-clear          Clear Liquibase checksums (MSSQL)" ; \
+	echo "  mssql-rollback       Roll back COUNT MSSQL changesets" ; \
+	echo "  mssql-status         Show MSSQL changelog status" ; \
 	echo "  build                Compile Go server" ; \
 	echo "  run                  Run server (dev)" ; \
 	@echo "  run-https            Run server over HTTPS (dev, defaults to 10001)" ; \
@@ -36,6 +41,32 @@ help:
 	echo "    Variables: SSH_HOST, SSH_USER, SSH_PORT, DOMAIN, CERTBOT=0|1, CERTBOT_EMAIL" ;
 	echo "  deploy-mac           Local HTTPS via Homebrew Nginx + mkcert (domain maps to 127.0.0.1)" ; \
 	echo "    Variables: DOMAIN (default: gra.tulus.tech), APP_PORT (default: 10010)" ;
+
+# ===== Liquibase: MSSQL / Azure SQL =====
+.PHONY: mssql-update
+mssql-update:
+	@echo "Running Liquibase update against MSSQL (Azure SQL)..."
+	$(LB) --defaultsFile=liquibase/mssql/liquibase.azure-sql.properties update
+
+.PHONY: mssql-update-sql
+mssql-update-sql:
+	@echo "Previewing Liquibase SQL for MSSQL (no apply)..."
+	$(LB) --defaultsFile=liquibase/mssql/liquibase.azure-sql.properties update-sql
+
+.PHONY: mssql-clear
+mssql-clear:
+	@echo "Clearing Liquibase checksums for MSSQL..."
+	$(LB) --defaultsFile=liquibase/mssql/liquibase.azure-sql.properties clearCheckSums
+
+.PHONY: mssql-rollback
+mssql-rollback:
+	@echo "Rolling back $$COUNT change set(s) on MSSQL..."
+	$(LB) --defaultsFile=liquibase/mssql/liquibase.azure-sql.properties rollback-count $(COUNT)
+
+.PHONY: mssql-status
+mssql-status:
+	@echo "Showing MSSQL changelog status..."
+	$(LB) --defaultsFile=liquibase/mssql/liquibase.azure-sql.properties status --verbose
 
 .PHONY: run-https
 run-https:

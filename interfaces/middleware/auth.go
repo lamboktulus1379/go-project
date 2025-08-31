@@ -21,6 +21,11 @@ func Auth(userRepository repository.IUser) gin.HandlerFunc {
 	res.ResponseMessage = "Unauthorized"
 
 	return func(ctx *gin.Context) {
+		// Allow CORS preflight requests to pass without auth
+		if ctx.Request.Method == http.MethodOptions {
+			ctx.AbortWithStatus(http.StatusNoContent)
+			return
+		}
 		authorization := ctx.Request.Header.Get("Authorization")
 		// Support auth_token query param for SSE/EventSource where custom headers aren't possible
 		if authorization == "" {

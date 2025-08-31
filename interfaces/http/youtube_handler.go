@@ -131,9 +131,15 @@ func (h *YouTubeHandler) GetMyVideos(ctx *gin.Context) {
 	// DB path
 	response, err := h.youtubeUseCase.ListVideosFromDB(ctx.Request.Context(), page, pageSize)
 	if err != nil {
+		// If DB cache is unavailable (e.g., running MSSQL-only), try fetching from YouTube API instead
+		apiResp, apiErr := h.youtubeUseCase.GetMyVideos(ctx.Request.Context(), req)
+		if apiErr == nil {
+			ctx.JSON(http.StatusOK, gin.H{"success": true, "data": apiResp, "source": "youtube"})
+			return
+		}
 		// Provide fallback mock data so FE can still render something and display error
 		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to get videos from DB",
+			"error":   "Failed to get videos",
 			"message": err.Error(),
 			"data": []gin.H{
 				{"id": "mock-error-1", "title": "YouTube fetch failed", "description": err.Error()},

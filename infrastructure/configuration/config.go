@@ -37,6 +37,7 @@ type Database struct {
 	Psql  Db `json:"psql"`
 	MySql Db `json:"mysql"`
 	Mongo Db `json:"mongo"`
+	Mssql Db `json:"mssql"`
 }
 
 type GoogleSheet struct {
@@ -194,6 +195,51 @@ func initDatabase(C *Config) {
 	}
 	if C.Database.Psql.Port == "" {
 		C.Database.Psql.Port = os.Getenv("DB_PORT")
+	}
+
+	// Optional MSSQL config via environment variables (for Azure SQL in production)
+	if C.Database.Mssql.Name == "" {
+		if v := os.Getenv("MSSQL_DB_NAME"); v != "" {
+			C.Database.Mssql.Name = v
+		}
+	}
+	if C.Database.Mssql.Host == "" {
+		if v := os.Getenv("MSSQL_HOST"); v != "" {
+			C.Database.Mssql.Host = v
+		}
+	}
+	if C.Database.Mssql.Password == "" {
+		if v := os.Getenv("MSSQL_PASSWORD"); v != "" {
+			C.Database.Mssql.Password = v
+		}
+	}
+	if C.Database.Mssql.Port == "" {
+		if v := os.Getenv("MSSQL_PORT"); v != "" {
+			C.Database.Mssql.Port = v
+		} else {
+			C.Database.Mssql.Port = "1433"
+		}
+	}
+	if C.Database.Mssql.User == "" {
+		if v := os.Getenv("MSSQL_USER"); v != "" {
+			C.Database.Mssql.User = v
+		}
+	}
+
+	// Fill local/dev sensible defaults for MSSQL if still empty (matches Typing docker-compose)
+	if C.Database.Mssql.Host == "" {
+		C.Database.Mssql.Host = "localhost"
+	}
+	if C.Database.Mssql.Port == "" {
+		C.Database.Mssql.Port = "1433"
+	}
+	// Default to SA user for local container only when nothing provided
+	if C.Database.Mssql.User == "" {
+		C.Database.Mssql.User = "sa"
+	}
+	if C.Database.Mssql.Password == "" {
+		// Matches MSSQL_SA_PASSWORD in Typing docker-compose; safe for local dev only
+		C.Database.Mssql.Password = "Toughpass1!"
 	}
 }
 

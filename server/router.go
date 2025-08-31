@@ -2,9 +2,12 @@ package server
 
 import (
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"my-project/domain/repository"
+	"my-project/infrastructure/configuration"
 	httpHandler "my-project/interfaces/http"
 	"my-project/interfaces/middleware"
 
@@ -23,20 +26,188 @@ func InitiateRouter(
 ) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Recovery())
+	// Determine allowed origins from environment (comma-separated), with sensible defaults
+	// Env keys supported: ALLOWED_ORIGINS or CORS_ALLOWED_ORIGINS
+	allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
+	if allowedOriginsEnv == "" {
+		allowedOriginsEnv = os.Getenv("CORS_ALLOWED_ORIGINS")
+	}
+	defaultAllowed := []string{
+		"https://tulus.tech",
+		"https://admin.tulus.tech",
+		"https://tulus.space",
+		"https://admin.tulus.space",
+		"https://user.tulus.space",
+		"https://typing.tulus.space",
+		"https://score.tulus.space",
+		"https://gra.tulus.space",
+		"https://gra.tulus.tech",
+		"https://simamora.tech",
+		"https://admin.simamora.tech",
+		"http://localhost:4201",
+		"http://localhost:4200",
+		"https://localhost:4201",
+		"https://localhost:4200",
+	}
+	// Parse env into a cleaned list; support wildcard patterns like https://*.tulus.tech
+	parseList := func(s string) []string {
+		parts := strings.Split(s, ",")
+		out := make([]string, 0, len(parts))
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			out = append(out, p)
+		}
+		return out
+	}
+	contains := func(list []string, target string) bool {
+		for _, v := range list {
+			if v == target {
+				return true
+			}
+		}
+		return false
+	}
+	// Wildcard match for entries like https://*.tulus.tech
+	matchesWildcard := func(pattern, origin string) bool {
+		// only support prefix "http://*." or "https://*." patterns
+		if strings.HasPrefix(pattern, "http://*.") {
+			suf := strings.TrimPrefix(pattern, "http://*.")
+			return strings.HasPrefix(origin, "http://") && strings.HasSuffix(origin, "."+suf)
+		}
+		if strings.HasPrefix(pattern, "https://*.") {
+			suf := strings.TrimPrefix(pattern, "https://*.")
+			return strings.HasPrefix(origin, "https://") && strings.HasSuffix(origin, "."+suf)
+		}
+		return false
+	}
+	allowedList := defaultAllowed
+	if allowedOriginsEnv != "" {
+		allowedList = parseList(allowedOriginsEnv)
+	}
+	// Use both AllowOrigins (for simple cases) and AllowOriginFunc (for wildcard patterns)
 	router.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://tulus.tech", "https://admin.tulus.tech", "http://localhost:4201", "http://localhost:4200", "https://localhost:4201", "https://localhost:4200"},
+		AllowOrigins:     allowedList,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With"},
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 		AllowOriginFunc: func(origin string) bool {
-			return origin == "https://tulus.tech" || origin == "https://admin.tulus.tech" || origin == "http://localhost:4201" || origin == "http://localhost:4200" || origin == "https://localhost:4201" || origin == "https://localhost:4200"
+			// exact match allowed
+			if contains(allowedList, origin) {
+				return true
+			}
+			// wildcard patterns
+			for _, p := range allowedList {
+				if matchesWildcard(p, origin) {
+					return true
+				}
+			}
+			return false
 		},
 		MaxAge: 12 * time.Hour,
 	}))
 
+	// Ensure all preflight requests get a 204 with middleware-applied CORS headers
+	router.OPTIONS("/*corsPreflight", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
 	api := router.Group("api")
 	api.Use(middleware.Auth(userRepository))
+
+	// Lightweight status endpoint to quickly diagnose YouTube configuration and mode
+	api.GET("/youtube/status", func(ctx *gin.Context) {
+		cfg, _ := configuration.GetYouTubeConfig()
+		modeEnv := os.Getenv("YOUTUBE_MODE")
+		enabledEnv := os.Getenv("YOUTUBE_ENABLED")
+
+		hasAccess := cfg != nil && cfg.AccessToken != "" && cfg.AccessToken != "your_access_token_here"
+		hasRefresh := cfg != nil && cfg.RefreshToken != "" && cfg.RefreshToken != "your_refresh_token_here"
+		hasTokens := hasAccess && hasRefresh
+		hasAPIKey := cfg != nil && cfg.APIKey != "" && cfg.APIKey != "YOUR_YOUTUBE_API_KEY"
+		channelID := ""
+		if cfg != nil {
+			channelID = cfg.ChannelID
+		}
+
+		clientMode := "none"
+		if hasTokens {
+			clientMode = "oauth"
+		} else if hasAPIKey {
+			clientMode = "apiKey"
+		}
+
+		// Determine effective mode seen by router
+		effectiveMode := "mock"
+		if modeEnv == "disabled" || enabledEnv == "false" {
+			effectiveMode = "disabled"
+		} else if youtubeHandler != nil && (hasTokens || hasAPIKey) {
+			effectiveMode = "live"
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data": gin.H{
+				"mode":            effectiveMode,
+				"handlerActive":   youtubeHandler != nil,
+				"hasApiKey":       hasAPIKey,
+				"hasTokens":       hasTokens,
+				"channelIdSet":    channelID != "",
+				"channelId":       channelID,
+				"clientMode":      clientMode,
+				"YOUTUBE_MODE":    modeEnv,
+				"YOUTUBE_ENABLED": enabledEnv,
+			},
+		})
+	})
+
+	// Public status (no auth) for quick diagnostics
+	router.GET("/youtube/status", func(ctx *gin.Context) {
+		cfg, _ := configuration.GetYouTubeConfig()
+		modeEnv := os.Getenv("YOUTUBE_MODE")
+		enabledEnv := os.Getenv("YOUTUBE_ENABLED")
+
+		hasAccess := cfg != nil && cfg.AccessToken != "" && cfg.AccessToken != "your_access_token_here"
+		hasRefresh := cfg != nil && cfg.RefreshToken != "" && cfg.RefreshToken != "your_refresh_token_here"
+		hasTokens := hasAccess && hasRefresh
+		hasAPIKey := cfg != nil && cfg.APIKey != "" && cfg.APIKey != "YOUR_YOUTUBE_API_KEY"
+		channelID := ""
+		if cfg != nil {
+			channelID = cfg.ChannelID
+		}
+
+		clientMode := "none"
+		if hasTokens {
+			clientMode = "oauth"
+		} else if hasAPIKey {
+			clientMode = "apiKey"
+		}
+
+		effectiveMode := "mock"
+		if modeEnv == "disabled" || enabledEnv == "false" {
+			effectiveMode = "disabled"
+		} else if youtubeHandler != nil && (hasTokens || hasAPIKey) {
+			effectiveMode = "live"
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data": gin.H{
+				"mode":            effectiveMode,
+				"handlerActive":   youtubeHandler != nil,
+				"hasApiKey":       hasAPIKey,
+				"hasTokens":       hasTokens,
+				"channelIdSet":    channelID != "",
+				"channelId":       channelID,
+				"clientMode":      clientMode,
+				"YOUTUBE_MODE":    modeEnv,
+				"YOUTUBE_ENABLED": enabledEnv,
+			},
+		})
+	})
 
 	// Root endpoint - return a simple message
 	router.GET("/", func(ctx *gin.Context) {

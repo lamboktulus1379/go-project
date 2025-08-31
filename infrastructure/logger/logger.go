@@ -23,21 +23,33 @@ func init() {
 	env := os.Getenv("ENV")
 	fmt.Println("ENV", env)
 	formatTime := time.Now().Format(layout)
-	// file, err := os.OpenFile(filepath.Join(cwd, fmt.Sprintf("%s%s-%s%s", "logs/", formatTime, env, ".log")), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if env == "stage" {
-		logger.Out = os.Stdout
-	}
-	if env == "prod" || env == "" {
-		file, err := os.OpenFile(
-			filepath.Join(cwd, fmt.Sprintf("%s%s%s%s", "logs/", formatTime, env, ".log")),
-			os.O_CREATE|os.O_WRONLY|os.O_APPEND,
-			0o666,
-		)
-		if err != nil {
-			log.Info("Failed to log to file, using default stderr")
-			// log.Fatal(err)
+	// Prefer stdout for non-local environments (better with systemd/docker).
+	// Allow overriding via LOG_TO_FILE=true to force file logging.
+	logToFile := os.Getenv("LOG_TO_FILE") == "true"
+	if env == "stage" || env == "prod" || env == "" {
+		if logToFile {
+			// Ensure logs directory exists
+			logsDir := filepath.Join(cwd, "logs")
+			if mkErr := os.MkdirAll(logsDir, 0o755); mkErr != nil {
+				log.Warnf("Failed to create logs directory %s: %v, falling back to stdout", logsDir, mkErr)
+				logger.Out = os.Stdout
+			} else {
+				filePath := filepath.Join(logsDir, fmt.Sprintf("%s%s.log", formatTime, env))
+				f, openErr := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
+				if openErr != nil {
+					log.Warnf("Failed to open log file %s: %v, falling back to stdout", filePath, openErr)
+					logger.Out = os.Stdout
+				} else {
+					logger.Out = f
+				}
+			}
+		} else {
+			// Default to stdout for prod/stage unless explicitly overridden.
+			logger.Out = os.Stdout
 		}
-		logger.Out = file
+	} else {
+		// For any other envs, default to stdout.
+		logger.Out = os.Stdout
 	}
 
 	logger.Formatter = &log.JSONFormatter{

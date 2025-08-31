@@ -61,6 +61,7 @@ func GetYouTubeConfig() (*YouTubeConfig, error) {
 
 	// Do not hard-fail when API key or tokens are missing; allow OAuth-only flows to proceed.
 	// Client initialization will decide between API-key mode (read-only) and OAuth mode.
+	// Note: You can force mock-only behavior by setting YOUTUBE_MODE=mock (or YOUTUBE_ENABLED=false).
 	return config, nil
 }
 
