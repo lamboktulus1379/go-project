@@ -148,7 +148,8 @@ func (h *YouTubeHandler) GetMyVideos(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"success": true, "data": response})
+	// Force DB-only: return whatever DB has (even if empty) so FE reflects sync state
+	ctx.JSON(http.StatusOK, gin.H{"success": true, "data": response, "source": "db"})
 }
 
 // SyncMyVideos handles POST /api/youtube/sync

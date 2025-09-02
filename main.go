@@ -210,13 +210,19 @@ func main() {
 		if err != nil {
 			logger.GetLogger().WithField("error", err).Warn("Failed to initialize YouTube client - YouTube features will be disabled")
 		} else {
-			// Ensure cache schema and attach cache repository
+			// Ensure cache schema and attach cache repository (PSQL or MSSQL)
+			var ytCache repository.IYouTubeCache
 			if psqlDb != nil {
 				if err := persistence.EnsureYouTubeCacheSchema(psqlDb); err != nil {
 					logger.GetLogger().WithField("error", err).Error("failed ensuring youtube cache schema")
 				}
+				ytCache = persistence.NewYouTubeCacheRepository(psqlDb)
+			} else if mysqlDb != nil { // MSSQL path
+				if err := persistence.EnsureYouTubeCacheSchemaMSSQL(mysqlDb); err != nil {
+					logger.GetLogger().WithField("error", err).Error("failed ensuring youtube cache schema (mssql)")
+				}
+				ytCache = persistence.NewYouTubeCacheRepositoryMSSQL(mysqlDb)
 			}
-			ytCache := persistence.NewYouTubeCacheRepository(psqlDb)
 			// Create YouTubeRepository that combines API client and cache
 			youtubeRepo := &persistence.YouTubeRepository{
 				CacheRepo:        ytCache,
@@ -245,7 +251,7 @@ func main() {
 	userHandler := httpHandler.NewUserHandler(userUsecase)
 	testHandler := httpHandler.NewTestHandler(testUsecase)
 
-	// Share feature wiring (PostgreSQL only for now)
+	// Share feature wiring (PostgreSQL or MSSQL)
 	var shareHandler httpHandler.IShareHandler
 	shareHub := realtime.NewShareHub()
 	if psqlDb != nil {
@@ -270,13 +276,39 @@ func main() {
 			shareHandler = httpHandler.NewShareHandler(shareUC, configuration.C.Share.Platforms)
 		}
 	} else {
-		logger.GetLogger().Info("PostgreSQL not available in this environment; Share feature disabled")
+		// MSSQL path
+		if mysqlDb != nil {
+			shareRepo := persistence.NewShareRepositoryMSSQL(mysqlDb)
+			oauthRepo := persistence.NewOAuthTokenRepositoryMSSQL(mysqlDb)
+			if err := persistence.EnsureOAuthTokenSchemaMSSQL(mysqlDb); err != nil {
+				logger.GetLogger().WithField("error", err).Error("failed ensuring oauth token schema (mssql)")
+			}
+			if err := persistence.EnsureShareSchemaMSSQL(mysqlDb); err != nil {
+				logger.GetLogger().WithField("error", err).Error("failed ensuring share schema (mssql)")
+			}
+			if len(configuration.C.Share.Platforms) == 0 {
+				configuration.C.Share.Platforms = []string{"twitter", "facebook", "whatsapp"}
+			}
+			if youtubeClient != nil {
+				shareUC := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms, youtubeClient)
+				shareUC = shareUC.WithBroadcaster(func(rec *model.VideoShareRecord) { shareHub.BroadcastShareStatus(rec) })
+				shareHandler = httpHandler.NewShareHandler(shareUC, configuration.C.Share.Platforms)
+			} else {
+				shareUC := usecase.NewShareUsecase(shareRepo, oauthRepo, configuration.C.Share.Platforms)
+				shareUC = shareUC.WithBroadcaster(func(rec *model.VideoShareRecord) { shareHub.BroadcastShareStatus(rec) })
+				shareHandler = httpHandler.NewShareHandler(shareUC, configuration.C.Share.Platforms)
+			}
+		} else {
+			logger.GetLogger().Info("No relational DB available for Share feature; disabled")
+		}
 	}
 
-	// Facebook OAuth handler (uses PostgreSQL-backed token repo); only when Postgres is available
+	// Facebook OAuth handler (uses token repo)
 	var facebookOAuthHandler httpHandler.IFacebookOAuthHandler
 	if psqlDb != nil {
 		facebookOAuthHandler = httpHandler.NewFacebookOAuthHandler(persistence.NewOAuthTokenRepository(psqlDb))
+	} else if mysqlDb != nil {
+		facebookOAuthHandler = httpHandler.NewFacebookOAuthHandler(persistence.NewOAuthTokenRepositoryMSSQL(mysqlDb))
 	}
 
 	router := server.InitiateRouter(userHandler, testHandler, youtubeHandler, youtubeAuthHandler, userRepository, shareHandler, facebookOAuthHandler)
@@ -290,10 +322,17 @@ func main() {
 	}
 
 	// Background share job processor (simple ticker loop)
-	if shareHandler != nil && psqlDb != nil {
-		// Recreate repos for job processor scope
-		shareRepo := persistence.NewShareRepository(psqlDb)
-		oauthRepo := persistence.NewOAuthTokenRepository(psqlDb)
+	if shareHandler != nil {
+		// Recreate repos for job processor scope (based on available DB)
+		var shareRepo repository.IShare
+		var oauthRepo repository.IOAuthToken
+		if psqlDb != nil {
+			shareRepo = persistence.NewShareRepository(psqlDb)
+			oauthRepo = persistence.NewOAuthTokenRepository(psqlDb)
+		} else if mysqlDb != nil {
+			shareRepo = persistence.NewShareRepositoryMSSQL(mysqlDb)
+			oauthRepo = persistence.NewOAuthTokenRepositoryMSSQL(mysqlDb)
+		}
 		g.Go(func() error {
 			ticker := time.NewTicker(15 * time.Second)
 			defer ticker.Stop()

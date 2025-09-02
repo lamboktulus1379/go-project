@@ -12,9 +12,9 @@ import (
 	"time"
 
 	"my-project/domain/model"
+	"my-project/domain/repository"
 	"my-project/infrastructure/configuration"
 	"my-project/infrastructure/logger"
-	"my-project/infrastructure/persistence"
 
 	"github.com/gin-gonic/gin"
 )
@@ -38,12 +38,12 @@ type oauthState struct {
 }
 
 type facebookOAuthHandler struct {
-	tokenRepo *persistence.OAuthTokenRepository
+	tokenRepo repository.IOAuthToken
 	stateMu   sync.Mutex
 	states    map[string]oauthState // state -> metadata
 }
 
-func NewFacebookOAuthHandler(tokenRepo *persistence.OAuthTokenRepository) IFacebookOAuthHandler {
+func NewFacebookOAuthHandler(tokenRepo repository.IOAuthToken) IFacebookOAuthHandler {
 	return &facebookOAuthHandler{tokenRepo: tokenRepo, states: map[string]oauthState{}}
 }
 

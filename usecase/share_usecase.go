@@ -328,6 +328,10 @@ func ProcessShareJobs(ctx context.Context, shareRepo repository.IShare, tokenRep
 				if _, err := sr.DB().ExecContext(ctx, `UPDATE share_jobs SET status='pending', updated_at=$1 WHERE id=$2`, time.Now().UTC(), job.ID); err == nil {
 					continue
 				}
+			} else if sr2, ok := shareRepo.(*persistence.ShareRepositoryMSSQL); ok {
+				if _, err := sr2.DB().ExecContext(ctx, `UPDATE dbo.[share_jobs] SET status='pending', updated_at=@p1 WHERE id=@p2`, time.Now().UTC(), job.ID); err == nil {
+					continue
+				}
 			}
 		}
 		// Fetch record for accurate audit + broadcast

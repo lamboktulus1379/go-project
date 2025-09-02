@@ -244,6 +244,10 @@ func initDatabase(C *Config) {
 }
 
 func initApp(C *Config) {
+	// Prefer SECRET_KEY from environment for JWT verification; overrides config file when provided
+	if v := os.Getenv("SECRET_KEY"); v != "" {
+		C.App.SecretKey = v
+	}
 	// Port resolution order (env overrides config): APP_PORT -> PORT -> config -> default 10001
 	if v := os.Getenv("APP_PORT"); v != "" {
 		if p, err := strconv.Atoi(v); err == nil {
@@ -287,6 +291,9 @@ func initApp(C *Config) {
 	}
 	if C.App.TLSEnabled {
 		logger.GetLogger().WithFields(map[string]interface{}{"cert": C.App.TLSCertFile, "key": C.App.TLSKeyFile}).Info("TLS enabled via configuration")
+	}
+	if C.App.SecretKey == "" {
+		logger.GetLogger().Warn("App.SecretKey not set; JWT authentication will fail. Provide SECRET_KEY via environment.")
 	}
 }
 

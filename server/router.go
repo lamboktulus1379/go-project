@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"my-project/domain/model"
 	"my-project/domain/repository"
 	"my-project/infrastructure/configuration"
 	httpHandler "my-project/interfaces/http"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt"
 )
 
 func InitiateRouter(
@@ -114,6 +116,33 @@ func InitiateRouter(
 	router.OPTIONS("/*corsPreflight", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
 	})
+
+	// Optional auth helper: sets user_id when a valid JWT is provided via Authorization header
+	// or auth_token query param; otherwise it leaves context untouched.
+	optionalAuth := func(c *gin.Context) {
+		authorization := c.Request.Header.Get("Authorization")
+		if authorization == "" {
+			if qt := c.Query("auth_token"); qt != "" {
+				authorization = "Bearer " + qt
+			}
+		}
+		if authorization == "" || !strings.HasPrefix(authorization, "Bearer ") {
+			return
+		}
+		secretKey := configuration.C.App.SecretKey
+		tokenStr := strings.TrimPrefix(authorization, "Bearer ")
+		var userClaims model.UserClaims
+		token, err := jwt.ParseWithClaims(
+			tokenStr,
+			&userClaims,
+			func(token *jwt.Token) (interface{}, error) { return []byte(secretKey), nil },
+		)
+		if err == nil && token != nil && token.Valid {
+			if _, err := userRepository.GetByUserName(c.Request.Context(), userClaims.UserName); err == nil {
+				c.Set("user_id", userClaims.Issuer)
+			}
+		}
+	}
 
 	api := router.Group("api")
 	api.Use(middleware.Auth(userRepository))
@@ -286,6 +315,19 @@ func InitiateRouter(
 		api.POST("/share/process-jobs", shareHandler.ProcessJobs)
 	}
 
+	// Public share-status endpoint with optional auth (so callers without token get an empty list,
+	// while authenticated callers receive their records). This exists regardless of YouTube handler presence.
+	router.GET("/api/youtube/videos/:videoId/share-status", func(c *gin.Context) {
+		if shareHandler != nil {
+			optionalAuth(c) // set user_id if token present; otherwise proceed without it
+			shareHandler.GetShareStatus(c)
+			return
+		}
+		// Graceful fallback when share handler is not configured
+		videoID := c.Param("videoId")
+		c.JSON(http.StatusOK, gin.H{"video_id": videoID, "records": []interface{}{}})
+	})
+
 	// YouTube API routes (only if handler is available)
 	if youtubeHandler != nil {
 		youtube := api.Group("/youtube")
@@ -327,13 +369,7 @@ func InitiateRouter(
 				}
 				c.JSON(http.StatusNotImplemented, gin.H{"error": "share handler not configured"})
 			})
-			youtube.GET("/videos/:videoId/share-status", func(c *gin.Context) {
-				if shareHandler != nil {
-					shareHandler.GetShareStatus(c)
-					return
-				}
-				c.JSON(http.StatusNotImplemented, gin.H{"error": "share handler not configured"})
-			})
+			// share-status route now exposed publicly above with optional auth; keep only POST here
 		}
 	} else {
 		// Add fallback endpoints when YouTube is not configured

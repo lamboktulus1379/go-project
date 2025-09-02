@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"my-project/domain/model"
 	"my-project/infrastructure/logger"
 	"my-project/usecase"
 
@@ -69,6 +70,9 @@ func (h *ShareHandler) GetShareStatus(ctx *gin.Context) {
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+	if list == nil {
+		list = []*model.VideoShareRecord{}
 	}
 	ctx.JSON(http.StatusOK, gin.H{"video_id": videoID, "records": list})
 }
