@@ -48,6 +48,27 @@ func (r *OAuthTokenRepositoryMSSQL) UpsertToken(ctx context.Context, t *model.OA
 		t.CreatedAt = now
 	}
 	t.UpdatedAt = now
+	// Normalize nullable values for MSSQL driver
+	var exp sql.NullTime
+	if t.ExpiresAt != nil {
+		exp.Valid = true
+		exp.Time = *t.ExpiresAt
+	}
+	var pageID sql.NullString
+	if t.PageID != nil {
+		pageID.Valid = true
+		pageID.String = *t.PageID
+	}
+	var pageName sql.NullString
+	if t.PageName != nil {
+		pageName.Valid = true
+		pageName.String = *t.PageName
+	}
+	var tokenType sql.NullString
+	if t.TokenType != nil {
+		tokenType.Valid = true
+		tokenType.String = *t.TokenType
+	}
 	// MERGE upsert by (user_id, platform)
 	q := `MERGE dbo.[oauth_tokens] AS target
 USING (VALUES (@p1, @p2)) AS src(user_id, platform)
@@ -64,7 +85,19 @@ WHEN MATCHED THEN UPDATE SET
 WHEN NOT MATCHED THEN
     INSERT (user_id, platform, access_token, refresh_token, expires_at, scopes, page_id, page_name, token_type, created_at, updated_at)
     VALUES (@p1,@p2,@p3,@p4,@p5,@p6,@p7,@p8,@p9,@p10,@p11);`
-	_, err := r.db.ExecContext(ctx, q, t.UserID, t.Platform, t.AccessToken, t.RefreshToken, t.ExpiresAt, t.Scopes, t.PageID, t.PageName, t.TokenType, t.CreatedAt, t.UpdatedAt)
+	_, err := r.db.ExecContext(ctx, q,
+		t.UserID, t.Platform,
+		t.AccessToken,
+		// Allow empty string for refresh_token; keep it nullable in schema but empty is fine
+		t.RefreshToken,
+		exp,
+		t.Scopes,
+		pageID,
+		pageName,
+		tokenType,
+		t.CreatedAt,
+		t.UpdatedAt,
+	)
 	return err
 }
 

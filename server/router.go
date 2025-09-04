@@ -255,7 +255,14 @@ func InitiateRouter(
 	if facebookOAuthHandler != nil {
 		router.GET("/auth/facebook", facebookOAuthHandler.GetAuthURL)
 		router.GET("/auth/facebook/callback", facebookOAuthHandler.Callback)
+		// Public read-only status route with optional auth (so FE can check connection without JWT)
+		router.GET("/facebook/status", func(c *gin.Context) {
+			optionalAuth(c)
+			facebookOAuthHandler.Status(c)
+		})
 		api.GET("/facebook/status", facebookOAuthHandler.Status)
+		// Admin seeding endpoints are disabled after initial bootstrap; keep the code available behind API if needed later
+		// Admin seeding endpoint removed for security. Use database migrations or controlled scripts if needed.
 		api.POST("/facebook/refresh-pages", facebookOAuthHandler.RefreshPages)
 		api.POST("/facebook/link-page", facebookOAuthHandler.LinkPage)
 		api.POST("/facebook/link-page-url", facebookOAuthHandler.LinkPageURL)

@@ -110,6 +110,9 @@ func NewYouTubeClient(ctx context.Context, config *Config) (repository.IYouTube,
 		oauthConfig: oauth2Config,
 		token:       token,
 		ctx:         ctx,
+		// ensure in-memory maps are initialized to avoid nil map assignment panics
+		commentLikes:  make(map[string]map[string]bool),
+		commentHearts: make(map[string]map[string]bool),
 	}
 
 	// If ChannelID is empty in OAuth mode, attempt to discover it via Channels.List(mine=true)

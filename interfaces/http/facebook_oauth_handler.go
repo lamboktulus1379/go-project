@@ -266,7 +266,8 @@ func (h *facebookOAuthHandler) Callback(c *gin.Context) {
 func (h *facebookOAuthHandler) Status(c *gin.Context) {
 	userID := c.GetString("user_id")
 	if userID == "" {
-		userID = "demo-user"
+		c.JSON(http.StatusUnauthorized, gin.H{"response_code": "401", "response_message": "Unauthorized"})
+		return
 	}
 	tok, err := h.tokenRepo.GetToken(c.Request.Context(), userID, "facebook")
 	if err != nil || tok == nil || tok.AccessToken == "" {
