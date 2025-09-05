@@ -1,3 +1,8 @@
+# Ignore local nginx backup snapshots and archives
+deploy/azure/nginx-backups/
+
+# Ignore local env overrides for rollback/deploy scripts
+deploy/azure/.env
 # General
 .DS_Store
 .vscode/
